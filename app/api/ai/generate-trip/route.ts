@@ -1,0 +1,143 @@
+import { NextResponse } from "next/server"
+import { z } from "zod"
+import { getServerSession } from "@/lib/services/server-session-service"
+import { generateAndPersistTrip, generateTripWithAI } from "@/lib/services/trip-service"
+import { createSupabaseAdminClient } from "@/lib/supabase/server"
+
+const quizAnswersSchema = z.object({
+  tripStyle: z.enum(["solo", "romantica", "familia", "aventura", "descanso", "luxo", "cultural"]),
+  budget: z.enum(["ate-3000", "ate-5000", "ate-8000", "acima-8000"]),
+  duration: z.enum(["fim-de-semana", "4-6-dias", "7-10-dias", "11+-dias"]),
+  region: z.enum(["brasil", "internacional"]),
+  vibe: z.enum(["praia", "inverno", "verao", "cultura", "natureza", "luxo"]),
+})
+
+const generateTripPayloadSchema = z.object({
+  origin: z.enum(["busca", "quiz", "sugestao"]).optional(),
+  input: z.string().optional(),
+  quizAnswers: quizAnswersSchema.optional(),
+})
+
+function jsonOk(data: unknown, init?: ResponseInit) {
+  return NextResponse.json({ ok: true, data }, init)
+}
+
+function jsonError(error: string, code: string, status: number, detail?: string) {
+  return NextResponse.json({ ok: false, error, code, detail }, { status })
+}
+
+export async function POST(request: Request) {
+  console.time("generate-trip-total")
+  let json: unknown
+
+  try {
+    json = await request.json()
+  } catch (error) {
+    console.error("Invalid JSON payload for trip generation", error)
+    return jsonError("Os dados enviados para gerar a viagem são inválidos.", "INVALID_JSON", 400, "Invalid JSON payload")
+  }
+
+  const parsedPayload = generateTripPayloadSchema.safeParse(json)
+
+  if (!parsedPayload.success) {
+    return jsonError("Os dados enviados para gerar a viagem são inválidos.", "INVALID_PAYLOAD", 400, parsedPayload.error.message)
+  }
+
+  const body = parsedPayload.data
+  const origin = body.origin ?? "busca"
+  const session = await getServerSession()
+
+  console.debug("Trip generation request received", {
+    authenticated: !!session?.isAuthenticated,
+    origin,
+    hasInput: !!body.input?.trim(),
+    hasQuizAnswers: !!body.quizAnswers,
+  })
+
+  try {
+    if (!session?.isAuthenticated) {
+      try {
+        const result = await generateTripWithAI({
+          origin,
+          inputText: body.input?.trim() || "quero viajar para europa com 5 mil reais",
+          quizAnswers: body.quizAnswers,
+        })
+
+        let publicSearchId: string | undefined
+
+        try {
+          const supabase = createSupabaseAdminClient()
+          const prompt =
+            origin === "quiz"
+              ? `Quiz: ${body.quizAnswers?.tripStyle ?? ""}, ${body.quizAnswers?.budget ?? ""}, ${body.quizAnswers?.duration ?? ""}, ${body.quizAnswers?.region ?? ""}, ${body.quizAnswers?.vibe ?? ""}`
+              : body.input?.trim() || "Busca VUEI"
+
+          const inserted = await supabase
+            .from("searches")
+            .insert({
+              email: null,
+              user_id: null,
+              source: origin === "quiz" ? "quiz" : "landing",
+              prompt,
+              result,
+              credits_used: 0,
+            })
+            .select("id")
+            .maybeSingle()
+
+          if (inserted.error) {
+            console.error("PUBLIC SEARCH INSERT ERROR:", inserted.error)
+          } else {
+            publicSearchId = inserted.data?.id
+          }
+        } catch (error) {
+          console.error("PUBLIC SEARCH INSERT ERROR:", error)
+        }
+
+        return jsonOk({
+          persisted: !!publicSearchId,
+          tripId: publicSearchId,
+          result,
+        })
+      } catch (error) {
+        console.error("OpenAI trip generation failed", error)
+        const status =
+          typeof error === "object" && error !== null && "status" in error && Number(error.status) === 429 ? 429 : 503
+        const message =
+          status === 429
+            ? "Não foi possível gerar sua viagem agora. Verifique a cota da OpenAI ou tente novamente mais tarde."
+            : "Não foi possível gerar sua viagem agora. Tente novamente em instantes."
+
+        const detail =
+          typeof error === "object" && error !== null && "message" in error && typeof error.message === "string"
+            ? error.message
+            : "OpenAI trip generation failed"
+
+        return jsonError(message, "AI_UNAVAILABLE", status, detail)
+      }
+    }
+
+    const response = await generateAndPersistTrip({
+      session,
+      request: {
+        origin,
+        inputText: body.input?.trim(),
+        quizAnswers: body.quizAnswers,
+        userId: session.userId ?? undefined,
+      },
+    })
+
+    if (!response.ok) {
+      return jsonError(response.message, response.error, response.status, response.error)
+    }
+
+    return jsonOk({
+      persisted: !!response.tripId,
+      tripId: response.tripId,
+      remainingCredits: response.remainingCredits,
+      result: response.result,
+    })
+  } finally {
+    console.timeEnd("generate-trip-total")
+  }
+}
