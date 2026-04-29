@@ -1,23 +1,19 @@
 import Stripe from "stripe"
 
-const STRIPE_API_VERSION = "2026-04-22.dahlia"
+const secretKey = process.env.STRIPE_SECRET_KEY
 
-let stripeClient: Stripe | null = null
+export const stripe = new Stripe(secretKey!, {
+  apiVersion: "2025-02-24.acacia" as never,
+  timeout: 20000,
+  maxNetworkRetries: 2,
+})
 
 export function getStripeServerClient() {
-  const secretKey = process.env.STRIPE_SECRET_KEY
-
   if (!secretKey) {
     throw new Error("Stripe server env vars are missing. Configure STRIPE_SECRET_KEY.")
   }
 
-  if (!stripeClient) {
-    stripeClient = new Stripe(secretKey, {
-      apiVersion: STRIPE_API_VERSION,
-    })
-  }
-
-  return stripeClient
+  return stripe
 }
 
 export function assertStripeWebhookSecret() {
