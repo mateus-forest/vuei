@@ -4,7 +4,6 @@ import Link from "next/link"
 import { useState } from "react"
 import { ArrowRight, LockKeyhole, Mail, User2 } from "lucide-react"
 import { sendPasswordReset, signInWithPassword, signUpWithPassword } from "@/lib/services/session-service"
-import { getSupabaseBrowserClient } from "@/lib/supabase/client"
 import { GradientButton } from "@/components/ui/gradient-button"
 import { BrandCard } from "@/components/ui/brand-card"
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog"
@@ -138,7 +137,7 @@ export function AuthForm({ mode }: { mode: "login" | "signup" }) {
       }
 
       if (!data.session) {
-        setAuthError("Conta criada. Se a confirmação de email estiver ativa no Supabase, confirme seu email antes de entrar.")
+        setAuthError("Conta criada. Confirme seu email antes de entrar.")
         return
       }
 

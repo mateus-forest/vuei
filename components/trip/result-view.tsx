@@ -79,6 +79,28 @@ function formatPrice(value: number) {
   }).format(value)
 }
 
+function inferTravelers(bestFor: string) {
+  const normalized = bestFor.toLowerCase()
+
+  if (normalized.includes("solo")) {
+    return 1
+  }
+
+  if (normalized.includes("fam")) {
+    return 3
+  }
+
+  if (normalized.includes("casal") || normalized.includes("dupla")) {
+    return 2
+  }
+
+  return 2
+}
+
+function formatTravelerLabel(count: number) {
+  return count === 1 ? "1 pessoa" : `${count} pessoas`
+}
+
 function slugify(value: string) {
   return value
     .toLowerCase()
@@ -251,6 +273,9 @@ export function ResultView({
   const activePeriodItinerary = activeVariant.periodItinerary
   const activeDetailedItinerary = activeResult.fullItinerary ?? buildDetailedItinerary(activeResult)
   const activeCost = parsePrice(activeResult.estimatedCost)
+  const travelersCount = inferTravelers(activeResult.bestFor)
+  const daysCount = Math.max(activePeriodItinerary.length, activeResult.itinerary.length, 1)
+  const costPerTraveler = Math.max(300, Math.round(activeCost / travelersCount))
 
   const originSubtitle =
     source === "quiz"
@@ -382,8 +407,12 @@ export function ResultView({
               </div>
 
               <div className="min-w-[220px] rounded-[24px] border border-border/60 bg-secondary/40 p-5">
-                <div className="text-sm text-muted-foreground">Custo estimado</div>
+                <div className="text-sm text-muted-foreground">Custo total estimado</div>
                 <div className="mt-2 text-3xl font-semibold text-foreground">{activeResult.estimatedCost}</div>
+                <div className="mt-3 text-sm text-muted-foreground">Custo estimado por pessoa: {formatPrice(costPerTraveler)}</div>
+                <div className="mt-2 text-sm text-muted-foreground">
+                  Baseado em {formatTravelerLabel(travelersCount)} por {daysCount} {daysCount === 1 ? "dia" : "dias"}
+                </div>
                 <div className="mt-2 text-sm text-muted-foreground">Ideal para {activeResult.bestFor}</div>
               </div>
             </div>
@@ -407,7 +436,14 @@ export function ResultView({
                     <div className="flex items-start justify-between gap-4">
                       <div>
                         <div className="text-sm font-medium text-foreground">{variant.title}</div>
-                        <div className="mt-2 text-2xl font-semibold text-foreground">{formatPrice(variant.total)}</div>
+                        <div className="mt-2 text-xs uppercase tracking-[0.14em] text-muted-foreground">Custo total estimado</div>
+                        <div className="mt-1 text-2xl font-semibold text-foreground">{formatPrice(variant.total)}</div>
+                        <div className="mt-2 text-sm text-muted-foreground">
+                          Por pessoa: {formatPrice(Math.max(300, Math.round(variant.total / travelersCount)))}
+                        </div>
+                        <div className="mt-1 text-xs text-muted-foreground">
+                          Baseado em {formatTravelerLabel(travelersCount)} por {daysCount} {daysCount === 1 ? "dia" : "dias"}
+                        </div>
                       </div>
                     </div>
 
@@ -415,7 +451,12 @@ export function ResultView({
                       {variant.breakdown.map((item) => (
                         <div key={`${variant.id}-${item.label}`} className="flex items-center justify-between gap-3 text-sm">
                           <span className="text-muted-foreground">{item.label}</span>
-                          <span className="font-medium text-foreground">{formatPrice(item.value)}</span>
+                          <span className="text-right font-medium text-foreground">
+                            {formatPrice(item.value)}
+                            <span className="block text-xs font-normal text-muted-foreground">
+                              {formatPrice(Math.max(100, Math.round(item.value / travelersCount)))} por pessoa
+                            </span>
+                          </span>
                         </div>
                       ))}
                     </div>

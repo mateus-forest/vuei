@@ -31,6 +31,20 @@ function normalizeAuthError(error: AuthError | null) {
     } as AuthError
   }
 
+  if (normalizedMessage.includes("invalid login credentials")) {
+    return {
+      ...error,
+      message: "Email ou senha inválidos.",
+    } as AuthError
+  }
+
+  if (normalizedMessage.includes("signup requires a valid password")) {
+    return {
+      ...error,
+      message: "A senha informada não atende aos requisitos mínimos.",
+    } as AuthError
+  }
+
   return error
 }
 
