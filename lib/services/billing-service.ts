@@ -7,6 +7,7 @@ type StripePlanConfig = {
   credits: number
   label: string
   priceEnvKey: string
+  paymentLinkEnvKey: string
 }
 
 const stripePlanConfigs: Record<StripePlanId, StripePlanConfig> = {
@@ -15,18 +16,21 @@ const stripePlanConfigs: Record<StripePlanId, StripePlanConfig> = {
     credits: 5,
     label: "5 créditos",
     priceEnvKey: "STRIPE_PRICE_ID_PACK_5",
+    paymentLinkEnvKey: "STRIPE_PAYMENT_LINK_PACK_5",
   },
   "pack-15": {
     id: "pack-15",
     credits: 15,
     label: "15 créditos",
     priceEnvKey: "STRIPE_PRICE_ID_PACK_15",
+    paymentLinkEnvKey: "STRIPE_PAYMENT_LINK_PACK_15",
   },
   "pack-30": {
     id: "pack-30",
     credits: 30,
     label: "30 créditos",
     priceEnvKey: "STRIPE_PRICE_ID_PACK_30",
+    paymentLinkEnvKey: "STRIPE_PAYMENT_LINK_PACK_30",
   },
 }
 
@@ -42,11 +46,13 @@ export function getStripePlanConfig(planId: string) {
   const config = stripePlanConfigs[planId]
   const packageData = creditPackages.find((pack) => pack.id === planId)
   const priceId = process.env[config.priceEnvKey]
+  const paymentLink = process.env[config.paymentLinkEnvKey]
 
   return {
     ...config,
     displayPrice: packageData?.price ?? "",
     priceId: priceId ?? "",
+    paymentLink: paymentLink ?? "",
   }
 }
 

@@ -13,6 +13,7 @@ type StripeLikeError = {
   type?: string
   code?: string
   param?: string
+  name?: string
 }
 
 function jsonOk(data: unknown, init?: ResponseInit) {
@@ -21,6 +22,20 @@ function jsonOk(data: unknown, init?: ResponseInit) {
 
 function jsonError(error: string, code: string, status: number, detail?: string) {
   return NextResponse.json({ ok: false, error, code, detail }, { status })
+}
+
+function isStripeConnectionError(error: StripeLikeError | null | undefined) {
+  const name = error?.name ?? ""
+  const type = error?.type ?? ""
+  const code = error?.code ?? ""
+  const message = error?.message ?? ""
+
+  return (
+    name === "StripeConnectionError" ||
+    type === "StripeConnectionError" ||
+    code === "StripeConnectionError" ||
+    message.includes("connection to Stripe")
+  )
 }
 
 export async function POST(request: Request) {
@@ -97,7 +112,7 @@ export async function POST(request: Request) {
       return jsonError("Não foi possível iniciar o checkout agora.", "CHECKOUT_URL_MISSING", 500)
     }
 
-    return jsonOk({ url: session.url })
+    return jsonOk({ url: session.url, fallback: false })
   } catch (error) {
     const stripeError = error as StripeLikeError
 
@@ -106,7 +121,18 @@ export async function POST(request: Request) {
       type: stripeError?.type,
       code: stripeError?.code,
       param: stripeError?.param,
+      name: stripeError?.name,
     })
+
+    if (isStripeConnectionError(stripeError)) {
+      console.log("CHECKOUT PAYMENT LINK FALLBACK", plan.paymentLink || null)
+
+      if (plan.paymentLink) {
+        return jsonOk({ url: plan.paymentLink, fallback: true })
+      }
+
+      return jsonError("Pacote de créditos ainda não configurado.", "PAYMENT_LINK_FALLBACK_MISSING", 500)
+    }
 
     return jsonError("Não foi possível iniciar o checkout agora.", "STRIPE_CHECKOUT_FAILED", 500)
   }
