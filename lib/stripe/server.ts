@@ -1,11 +1,18 @@
+import https from "https"
 import Stripe from "stripe"
+
+const agent = new https.Agent({
+  keepAlive: true,
+  family: 4,
+})
 
 const secretKey = process.env.STRIPE_SECRET_KEY
 
 export const stripe = new Stripe(secretKey!, {
   apiVersion: "2025-02-24.acacia" as never,
+  httpAgent: agent,
   timeout: 20000,
-  maxNetworkRetries: 2,
+  maxNetworkRetries: 3,
 })
 
 export function getStripeServerClient() {
