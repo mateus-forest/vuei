@@ -51,5 +51,15 @@ export function getStripePlanConfig(planId: string) {
 }
 
 export function getAppBaseUrl() {
-  return process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000"
+  const configuredUrl = process.env.NEXT_PUBLIC_APP_URL?.trim()
+
+  if (configuredUrl) {
+    return configuredUrl.replace(/\/+$/, "")
+  }
+
+  if (process.env.NODE_ENV === "production") {
+    return ""
+  }
+
+  return "http://localhost:3000"
 }

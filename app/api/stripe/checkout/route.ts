@@ -8,6 +8,13 @@ const payloadSchema = z.object({
   plan: z.string().min(1),
 })
 
+type StripeLikeError = {
+  message?: string
+  type?: string
+  code?: string
+  param?: string
+}
+
 function jsonOk(data: unknown, init?: ResponseInit) {
   return NextResponse.json({ ok: true, data }, init)
 }
@@ -32,6 +39,28 @@ export async function POST(request: Request) {
     return jsonError("Os dados enviados para checkout são inválidos.", "INVALID_PAYLOAD", 400, parsed.error.message)
   }
 
+  const planId = parsed.data.plan
+  const plan = getStripePlanConfig(planId)
+  const hasStripeSecretKey = Boolean(process.env.STRIPE_SECRET_KEY)
+  const appUrl = getAppBaseUrl()
+
+  console.log("CHECKOUT PLAN", planId)
+  console.log("CHECKOUT PRICE ID", plan?.priceId ?? null)
+  console.log("CHECKOUT STRIPE SECRET CONFIGURED", hasStripeSecretKey)
+  console.log("CHECKOUT APP URL", appUrl)
+
+  if (!plan || !plan.priceId) {
+    return jsonError("Pacote de créditos ainda não configurado.", "INVALID_PLAN", 400)
+  }
+
+  if (!hasStripeSecretKey) {
+    return jsonError("Checkout ainda não configurado.", "STRIPE_SECRET_MISSING", 500)
+  }
+
+  if (!appUrl) {
+    return jsonError("Checkout ainda não configurado.", "APP_URL_MISSING", 500)
+  }
+
   const supabase = await createSupabaseServerClient()
   const {
     data: { user },
@@ -42,18 +71,8 @@ export async function POST(request: Request) {
     return jsonError("Faça login para comprar créditos.", "AUTH_REQUIRED", 401)
   }
 
-  const plan = getStripePlanConfig(parsed.data.plan)
-  console.log("CHECKOUT PLAN", parsed.data.plan)
-
-  if (!plan || !plan.priceId) {
-    console.log("CHECKOUT PRICE ID", plan?.priceId ?? null)
-    return jsonError("Pacote de créditos ainda não configurado.", "INVALID_PLAN", 400)
-  }
-
   try {
     const stripe = getStripeServerClient()
-    const appUrl = getAppBaseUrl()
-    console.log("CHECKOUT PRICE ID", plan.priceId)
 
     const session = await stripe.checkout.sessions.create({
       mode: "payment",
@@ -80,7 +99,15 @@ export async function POST(request: Request) {
 
     return jsonOk({ url: session.url })
   } catch (error) {
-    console.error("CHECKOUT ERROR", error)
+    const stripeError = error as StripeLikeError
+
+    console.error("CHECKOUT ERROR", {
+      message: stripeError?.message,
+      type: stripeError?.type,
+      code: stripeError?.code,
+      param: stripeError?.param,
+    })
+
     return jsonError("Não foi possível iniciar o checkout agora.", "STRIPE_CHECKOUT_FAILED", 500)
   }
 }
