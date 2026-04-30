@@ -1,12 +1,36 @@
 export type TripOrigin = "busca" | "quiz" | "sugestao"
 
+export type TripCostBreakdown = {
+  flights: number
+  lodging: number
+  food: number
+  localTransport: number
+  activities: number
+}
+
+export type TripVariant = {
+  type: "economic" | "intermediate" | "premium"
+  title: string
+  totalCost: number
+  costPerPerson: number
+  breakdown: TripCostBreakdown
+  assumptions: string
+  itinerary: string[]
+}
+
 export type TripResult = {
   destination: string
   estimatedCost: string
   bestFor: string
   summary: string
   periodLabel?: string
+  startDate?: string
+  endDate?: string
+  durationDays?: number
   durationLabel?: string
+  travelers?: number
+  currency?: "BRL"
+  variants?: TripVariant[]
   itinerary: string[]
   fullItinerary?: string[]
   tips: string[]
