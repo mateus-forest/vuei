@@ -41,6 +41,8 @@ type TripVariant = {
 type CompleteTripSummary = {
   destination: string
   periodLabel: string
+  isSuggestedPeriod: boolean
+  periodReason: string
   startDate?: string
   endDate?: string
   durationLabel: string
@@ -386,6 +388,8 @@ function buildCompleteTripSummary({
   return {
     destination: result.destination || "Destino sugerido",
     periodLabel,
+    isSuggestedPeriod: result.isSuggestedPeriod ?? false,
+    periodReason: result.periodReason?.trim() || "Periodo ainda nao definido para a viagem.",
     startDate: result.startDate ? formatDateDisplay(result.startDate) : undefined,
     endDate: result.endDate ? formatDateDisplay(result.endDate) : undefined,
     durationLabel: formatDurationDisplay(result, durationDays),
@@ -741,10 +745,16 @@ export function ResultView({
             </div>
 
             <div className="mt-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-              <SummaryStat label="Periodo" value={tripPeriodText} />
+              <SummaryStat label={completeTripSummary.isSuggestedPeriod ? "Periodo recomendado" : "Periodo informado"} value={tripPeriodText} />
               <SummaryStat label="Duracao" value={durationText} />
               <SummaryStat label="Pessoas" value={formatTravelerLabel(travelersCount)} />
               <SummaryStat label="Por pessoa" value={formatPrice(costPerTraveler)} />
+            </div>
+
+            <div className="mt-3 rounded-[20px] border border-border/60 bg-secondary/20 px-4 py-3 text-sm text-muted-foreground">
+              {completeTripSummary.isSuggestedPeriod
+                ? completeTripSummary.periodReason
+                : `Periodo preservado a partir da busca. ${completeTripSummary.periodReason}`}
             </div>
           </BrandCard>
 
@@ -1240,6 +1250,8 @@ export function ResultView({
             estimatedCost={completeTripSummary.estimatedCost}
             originSubtitle={originSubtitle}
             periodLabel={completeTripSummary.periodLabel}
+            isSuggestedPeriod={completeTripSummary.isSuggestedPeriod}
+            periodReason={completeTripSummary.periodReason}
             startDate={completeTripSummary.startDate}
             endDate={completeTripSummary.endDate}
             durationLabel={completeTripSummary.durationLabel}

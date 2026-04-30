@@ -18,7 +18,12 @@ function mapSearchRowToSearch(row: SearchRow): Search {
   const bestFor = typeof rawResult.bestFor === "string" ? rawResult.bestFor : "indefinido"
   const context = typeof rawResult.context === "string" ? rawResult.context : `Busca via ${row.source}`
   const periodLabel = typeof rawResult.periodLabel === "string" ? rawResult.periodLabel : undefined
+  const startDate = typeof rawResult.startDate === "string" ? rawResult.startDate : undefined
+  const endDate = typeof rawResult.endDate === "string" ? rawResult.endDate : undefined
+  const durationDays = typeof rawResult.durationDays === "number" ? rawResult.durationDays : undefined
   const durationLabel = typeof rawResult.durationLabel === "string" ? rawResult.durationLabel : undefined
+  const isSuggestedPeriod = typeof rawResult.isSuggestedPeriod === "boolean" ? rawResult.isSuggestedPeriod : undefined
+  const periodReason = typeof rawResult.periodReason === "string" ? rawResult.periodReason : undefined
   const intelligence =
     typeof rawResult.intelligence === "object" && rawResult.intelligence !== null
       ? (rawResult.intelligence as TripResult["intelligence"])
@@ -30,7 +35,12 @@ function mapSearchRowToSearch(row: SearchRow): Search {
     bestFor,
     summary,
     periodLabel,
+    startDate,
+    endDate,
+    durationDays,
     durationLabel,
+    isSuggestedPeriod,
+    periodReason,
     itinerary: shortItinerary,
     fullItinerary,
     tips,

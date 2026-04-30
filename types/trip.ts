@@ -64,6 +64,8 @@ export type TripResult = {
   endDate?: string
   durationDays?: number
   durationLabel?: string
+  isSuggestedPeriod?: boolean
+  periodReason?: string
   travelers?: number
   currency?: "BRL"
   variants?: TripVariant[]

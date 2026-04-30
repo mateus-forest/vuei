@@ -18,6 +18,8 @@ export function ItineraryPdfTemplate({
   estimatedCost,
   originSubtitle,
   periodLabel,
+  isSuggestedPeriod,
+  periodReason,
   startDate,
   endDate,
   durationLabel,
@@ -39,6 +41,8 @@ export function ItineraryPdfTemplate({
   estimatedCost: TripResult["estimatedCost"]
   originSubtitle: string
   periodLabel?: TripResult["periodLabel"]
+  isSuggestedPeriod?: boolean
+  periodReason?: string
   startDate?: string
   endDate?: string
   durationLabel?: TripResult["durationLabel"]
@@ -91,6 +95,7 @@ export function ItineraryPdfTemplate({
   }
 
   const safePeriod = periodLabel ?? "Per\u00edodo n\u00e3o informado"
+  const safePeriodReason = periodReason ?? "Periodo ainda nao definido para a viagem."
   const safeDates = startDate && endDate ? `${startDate} a ${endDate}` : startDate ?? endDate ?? "Nao informado"
   const safeDuration = durationLabel ?? `${durationDays} ${durationDays === 1 ? "dia" : "dias"}`
 
@@ -332,7 +337,7 @@ export function ItineraryPdfTemplate({
               <div style={printStyles.metaValue}>{destination}</div>
             </div>
             <div style={printStyles.metaItem}>
-              <div style={printStyles.metaTitle}>Periodo</div>
+              <div style={printStyles.metaTitle}>{isSuggestedPeriod ? "Periodo recomendado" : "Periodo informado"}</div>
               <div style={printStyles.metaValue}>{safePeriod}</div>
             </div>
             <div style={printStyles.metaItem}>
@@ -405,6 +410,7 @@ export function ItineraryPdfTemplate({
             <h2 style={printStyles.sectionTitle}>Resumo da viagem</h2>
           </div>
           <p style={printStyles.paragraph}>{normalizePdfText(summary)}</p>
+          <p style={{ ...printStyles.paragraph, marginTop: "10px" }}>{normalizePdfText(safePeriodReason)}</p>
         </section>
 
         <section data-pdf-section="short-itinerary" style={printStyles.card}>

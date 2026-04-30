@@ -7,6 +7,7 @@ import { CREDITS_PER_GENERATED_TRIP } from "@/lib/services/credit-service"
 import { getCurrentUser } from "@/lib/services/user-service"
 import { createSupabaseAdminClient } from "@/lib/supabase/server"
 import { buildTripIntelligence } from "@/lib/travel/travel-intelligence"
+import { resolveTripPeriod } from "@/lib/travel/trip-period"
 import type { AppSession } from "@/types/session"
 import type {
   QuizAnswer,
@@ -75,6 +76,8 @@ type PeriodData = {
   endDate?: string
   durationDays: number
   durationLabel: string
+  isSuggestedPeriod: boolean
+  periodReason: string
 }
 
 function normalizeText(value: string | null | undefined) {
@@ -212,6 +215,8 @@ function resolvePeriodData(request: TripGenerationInput): PeriodData {
       periodLabel: "Período não informado",
       durationDays,
       durationLabel,
+      isSuggestedPeriod: false,
+      periodReason: "Periodo ainda nao definido para a viagem.",
     }
   }
 
@@ -230,6 +235,8 @@ function resolvePeriodData(request: TripGenerationInput): PeriodData {
       endDate: `${endDay} de ${month}`,
       durationDays,
       durationLabel,
+      isSuggestedPeriod: false,
+      periodReason: "Periodo ainda nao definido para a viagem.",
     }
   }
 
@@ -245,6 +252,8 @@ function resolvePeriodData(request: TripGenerationInput): PeriodData {
       startDate: `${startDay} de ${month}`,
       durationDays,
       durationLabel,
+      isSuggestedPeriod: false,
+      periodReason: "Periodo ainda nao definido para a viagem.",
     }
   }
 
@@ -254,6 +263,8 @@ function resolvePeriodData(request: TripGenerationInput): PeriodData {
       periodLabel: monthMatch.charAt(0).toUpperCase() + monthMatch.slice(1),
       durationDays,
       durationLabel,
+      isSuggestedPeriod: false,
+      periodReason: "Mes informado pelo usuario e preservado como base da viagem.",
     }
   }
 
@@ -261,6 +272,30 @@ function resolvePeriodData(request: TripGenerationInput): PeriodData {
     periodLabel: "Período não informado",
     durationDays,
     durationLabel,
+      isSuggestedPeriod: false,
+      periodReason: "Periodo ainda nao definido para a viagem.",
+  }
+}
+
+function resolveTripPeriodData(request: TripGenerationInput, destination?: string): PeriodData {
+  const durationDays = resolveDurationDays(request)
+
+  if (!destination) {
+    return {
+      periodLabel: "PerÃ­odo nÃ£o informado",
+      durationDays,
+      durationLabel: `${durationDays} ${durationDays === 1 ? "dia" : "dias"}`,
+      isSuggestedPeriod: false,
+      periodReason: "Periodo ainda nao definido para a viagem.",
+    }
+  }
+
+  const intelligenceContext = buildTripIntelligence(destination, request)
+  const resolvedPeriod = resolveTripPeriod(request, intelligenceContext.destinationData, intelligenceContext.userProfile)
+
+  return {
+    ...resolvedPeriod,
+    durationLabel: `${resolvedPeriod.durationDays} ${resolvedPeriod.durationDays === 1 ? "dia" : "dias"}`,
   }
 }
 
@@ -689,7 +724,7 @@ function buildFallbackTripResult(origin: TripOrigin): TripResult {
 function normalizeTripResult(result: TripResult, request?: TripGenerationInput): TripResult {
   const bestFor = normalizeText(result.bestFor) || "viajantes em busca de praticidade"
   const normalizedCost = request ? normalizeEstimatedCost(result.estimatedCost, request, bestFor) : result.estimatedCost
-  const periodData = request ? resolvePeriodData(request) : null
+  const periodData = request ? resolveTripPeriodData(request, result.destination) : null
   const travelers = request ? inferTravelers(request, bestFor) : result.travelers ?? 2
   const intelligence = request ? buildTripIntelligence(result.destination, request).intelligence : result.intelligence
 
@@ -702,6 +737,8 @@ function normalizeTripResult(result: TripResult, request?: TripGenerationInput):
     endDate: result.endDate ?? periodData?.endDate,
     durationDays: result.durationDays ?? periodData?.durationDays,
     durationLabel: result.durationLabel ?? periodData?.durationLabel,
+    isSuggestedPeriod: result.isSuggestedPeriod ?? periodData?.isSuggestedPeriod ?? false,
+    periodReason: result.periodReason ?? periodData?.periodReason ?? "Periodo ainda nao definido para a viagem.",
     travelers,
     currency: "BRL",
     fullItinerary: result.fullItinerary ?? result.itinerary,
@@ -726,7 +763,10 @@ function buildSearchSource(request: TripGenerationInput, isAuthenticated: boolea
 }
 
 function buildUserPrompt(request: TripGenerationInput) {
-  const periodData = resolvePeriodData(request)
+  const destinationHint =
+    extractDestinationFromInput(request.inputText) ??
+    (request.origin === "quiz" && request.quizAnswers ? generateTripFromQuiz(request.quizAnswers).destination : undefined)
+  const periodData = resolveTripPeriodData(request, destinationHint)
   const travelers = inferTravelers(request)
   const profileLines = request.profile
     ? [
@@ -749,6 +789,8 @@ function buildUserPrompt(request: TripGenerationInput) {
       `- região: ${request.quizAnswers.region}`,
       `- vibe: ${request.quizAnswers.vibe}`,
       `- viajantes estimados: ${travelers}`,
+      `- status do periodo: ${periodData.isSuggestedPeriod ? "periodo recomendado pelo backend" : "periodo informado pelo usuario"}`,
+      `- motivo do periodo: ${periodData.periodReason}`,
       `- período informado: ${periodData.periodLabel}`,
       `- duração esperada: ${periodData.durationDays} dias`,
     ].join("\n")
@@ -758,6 +800,8 @@ function buildUserPrompt(request: TripGenerationInput) {
     `Origem: ${request.origin}`,
     `Solicitação do usuário: ${request.inputText?.trim() || "Busca VUEI"}`,
     `Viajantes estimados: ${travelers}`,
+    `Status do periodo: ${periodData.isSuggestedPeriod ? "periodo recomendado pelo backend" : "periodo informado pelo usuario"}`,
+    `Motivo do periodo: ${periodData.periodReason}`,
     `Período informado: ${periodData.periodLabel}`,
     `Duração esperada: ${periodData.durationDays} dias`,
   ].join("\n")
@@ -766,7 +810,9 @@ function buildUserPrompt(request: TripGenerationInput) {
 function mapStructuredOutputToTripResult(output: z.infer<typeof aiTripSchema>, request: TripGenerationInput): TripResult {
   const fallbackDestination = extractDestinationFromInput(request.inputText) ?? generateTripFromInput(request.inputText ?? "").destination
   const destination = normalizeText(output.destination) || fallbackDestination
-  const periodData = resolvePeriodData(request)
+  const periodData = resolveTripPeriodData(request, destination)
+  const normalizedPeriodLabel = normalizeText(output.periodLabel)
+  const aiReturnedUnknownPeriod = normalizedPeriodLabel.includes("nao informado")
   const durationDays = output.durationDays > 0 ? output.durationDays : periodData.durationDays
   const travelers = output.travelers > 0 ? output.travelers : inferTravelers(request, output.bestFor)
 
@@ -817,11 +863,13 @@ function mapStructuredOutputToTripResult(output: z.infer<typeof aiTripSchema>, r
       summary:
         normalizeText(output.summary) ||
         `Sugestão de viagem para ${destination}, com custos estimados em BRL e variações por perfil, duração e quantidade de pessoas.`,
-      periodLabel: normalizeText(output.periodLabel) || periodData.periodLabel,
-      startDate: normalizeText(output.startDate ?? undefined) || periodData.startDate,
-      endDate: normalizeText(output.endDate ?? undefined) || periodData.endDate,
+      periodLabel: !aiReturnedUnknownPeriod && normalizedPeriodLabel ? normalizedPeriodLabel : periodData.periodLabel,
+      startDate: periodData.startDate ? normalizeText(output.startDate ?? undefined) || periodData.startDate : periodData.startDate,
+      endDate: periodData.endDate ? normalizeText(output.endDate ?? undefined) || periodData.endDate : periodData.endDate,
       durationDays,
       durationLabel: `${durationDays} ${durationDays === 1 ? "dia" : "dias"}`,
+      isSuggestedPeriod: periodData.isSuggestedPeriod,
+      periodReason: periodData.periodReason,
       travelers,
       currency: "BRL",
       variants: normalizedVariants,
@@ -923,6 +971,7 @@ export async function generateTripWithAI(request: TripGenerationInput) {
                 "Não invente preço exato de passagem ou hotel; trate tudo como estimativa realista.",
                 "Sempre inclua três variações: economic, intermediate e premium.",
                 "Se houver scores e explicações do backend, use esses valores literalmente como referência.",
+                "Quando o usuario nao informar periodo, use o periodo recomendado pelo backend como base da viagem. Explique que o periodo foi sugerido pelo VUEI com base em clima, custo, lotacao e perfil. Nao invente datas exatas se elas nao foram fornecidas.",
               ].join(" "),
             },
           ],
@@ -1212,3 +1261,9 @@ export function generateTripFromQuiz(answers: QuizAnswer): TripResult {
     },
   )
 }
+
+
+
+
+
+

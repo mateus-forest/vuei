@@ -12,6 +12,7 @@ export type TravelDestinationData = {
   country: string
   region: string
   tags: string[]
+  bestMonths?: number[]
   highSeasonMonths: number[]
   lowSeasonMonths: number[]
   avgDailyCostBRL: number
