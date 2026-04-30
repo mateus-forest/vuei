@@ -2,7 +2,7 @@
 
 import Link from "next/link"
 import { type ReactNode, useMemo, useRef, useState } from "react"
-import { ArrowLeftRight, Compass, CreditCard, Download, Map, Wallet } from "lucide-react"
+import { ArrowLeftRight, Compass, CreditCard, Download, Map, Sparkles, Wallet } from "lucide-react"
 import { ItineraryPdfTemplate } from "@/components/trip/itinerary-pdf-template"
 import { BrandCard } from "@/components/ui/brand-card"
 import { GradientButton } from "@/components/ui/gradient-button"
@@ -239,6 +239,48 @@ function buildTripVariants(result: TripResult, currentCost: number) {
   })
 }
 
+function getCompatibilityLabel(score: number) {
+  if (score <= 39) return "Baixa compatibilidade"
+  if (score <= 69) return "Boa compatibilidade"
+  return "Alta compatibilidade"
+}
+
+function getAffordabilityLabel(score: number) {
+  if (score <= 30) return "Caro"
+  if (score <= 60) return "Razoável"
+  return "Econômico"
+}
+
+function getCrowdLabel(score: number) {
+  if (score <= 30) return "Tranquilo"
+  if (score <= 70) return "Moderado"
+  return "Muito cheio"
+}
+
+function IntelligenceMetricCard({
+  title,
+  score,
+  label,
+}: {
+  title: string
+  score?: number
+  label?: string
+}) {
+  if (typeof score !== "number") {
+    return null
+  }
+
+  return (
+    <div className="rounded-[24px] border border-border/60 bg-white/80 p-4 shadow-sm backdrop-blur">
+      <div className="text-sm text-muted-foreground">{title}</div>
+      <div className="mt-2 flex items-end justify-between gap-3">
+        <div className="text-3xl font-semibold text-foreground">{score}</div>
+        <div className="rounded-full bg-secondary/70 px-3 py-1 text-xs font-medium text-foreground">{label ?? "Analisado"}</div>
+      </div>
+    </div>
+  )
+}
+
 export function ResultView({
   result,
   input,
@@ -277,6 +319,9 @@ export function ResultView({
   const daysCount = Math.max(activePeriodItinerary.length, activeResult.itinerary.length, 1)
   const costPerTraveler = Math.max(300, Math.round(activeCost / travelersCount))
   const tripPeriodText = activeResult.periodLabel ?? activeResult.durationLabel ?? "Período não informado"
+  const intelligence = activeResult.intelligence
+  const intelligenceReasons = intelligence?.explanation?.reasons?.filter(Boolean) ?? []
+  const intelligenceWarnings = intelligence?.explanation?.warnings?.filter(Boolean) ?? []
 
   const originSubtitle =
     source === "quiz"
@@ -521,6 +566,110 @@ export function ResultView({
               </div>
             </BrandCard>
           </div>
+
+          {intelligence ? (
+            <BrandCard className="p-6 sm:p-7">
+              <div className="flex items-start gap-3">
+                <div className="rounded-2xl bg-[linear-gradient(135deg,#5de0e620,#004aad12)] p-3">
+                  <Sparkles className="size-5 text-[#004aad]" />
+                </div>
+                <div>
+                  <h3 className="text-xl font-semibold text-foreground">Por que essa viagem faz sentido para você</h3>
+                  <p className="mt-2 max-w-3xl text-sm leading-6 text-muted-foreground">
+                    Analisamos custo, clima, período, lotação e perfil da viagem para montar essa recomendação.
+                  </p>
+                </div>
+              </div>
+
+              <div className="mt-6 grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
+                <IntelligenceMetricCard
+                  title="Score de compatibilidade"
+                  score={intelligence.destinationMatchScore}
+                  label={getCompatibilityLabel(intelligence.destinationMatchScore)}
+                />
+                <IntelligenceMetricCard
+                  title="Acessibilidade de custo"
+                  score={intelligence.affordabilityScore}
+                  label={getAffordabilityLabel(intelligence.affordabilityScore)}
+                />
+                <IntelligenceMetricCard
+                  title="Melhor momento de compra"
+                  score={intelligence.smartTimingScore?.score}
+                  label={intelligence.smartTimingScore?.label}
+                />
+                <IntelligenceMetricCard
+                  title="Conforto climático"
+                  score={intelligence.climateComfortScore}
+                  label="Condições estimadas"
+                />
+                <IntelligenceMetricCard
+                  title="Lotação turística"
+                  score={intelligence.overcrowdingIndex?.score}
+                  label={intelligence.overcrowdingIndex?.label ?? getCrowdLabel(intelligence.overcrowdingIndex?.score ?? 0)}
+                />
+                <IntelligenceMetricCard
+                  title="Conforto da rota"
+                  score={intelligence.routeComfortScore}
+                  label="Deslocamento e mobilidade"
+                />
+              </div>
+
+              <div className="mt-6 grid gap-4 lg:grid-cols-[1.2fr_0.8fr]">
+                {intelligence.explanation?.summary ? (
+                  <div className="rounded-[24px] border border-border/60 bg-secondary/25 p-5">
+                    <div className="text-sm font-medium text-foreground">Inteligência da viagem</div>
+                    <p className="mt-3 text-sm leading-6 text-muted-foreground">{intelligence.explanation.summary}</p>
+                  </div>
+                ) : null}
+
+                {intelligence.dataConfidence ? (
+                  <div className="rounded-[24px] border border-border/60 bg-white/80 p-5">
+                    <div className="text-sm font-medium text-foreground">Segurança da análise</div>
+                    <p className="mt-3 text-sm leading-6 text-muted-foreground">
+                      {intelligence.dataConfidence === "high"
+                        ? "Usamos dados mais específicos para esse destino, deixando a leitura mais precisa."
+                        : intelligence.dataConfidence === "medium"
+                          ? "Combinamos dados do destino com estimativas seguras para manter a recomendação confiável."
+                          : "A recomendação foi completada com heurísticas regionais para não travar sua experiência."}
+                    </p>
+                  </div>
+                ) : null}
+              </div>
+
+              {intelligenceReasons.length > 0 || intelligenceWarnings.length > 0 ? (
+                <div className="mt-6 grid gap-4 lg:grid-cols-2">
+                  {intelligenceReasons.length > 0 ? (
+                    <div className="rounded-[24px] border border-border/60 bg-white/80 p-5">
+                      <div className="text-sm font-medium text-foreground">O que reforça essa escolha</div>
+                      <div className="mt-4 space-y-3">
+                        {intelligenceReasons.map((reason) => (
+                          <div key={reason} className="rounded-2xl bg-secondary/45 px-4 py-3 text-sm leading-6 text-muted-foreground">
+                            {reason}
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  ) : null}
+
+                  {intelligenceWarnings.length > 0 ? (
+                    <div className="rounded-[24px] border border-border/60 bg-white/80 p-5">
+                      <div className="text-sm font-medium text-foreground">Pontos de atenção para decidir melhor</div>
+                      <div className="mt-4 space-y-3">
+                        {intelligenceWarnings.map((warning) => (
+                          <div
+                            key={warning}
+                            className="rounded-2xl bg-[linear-gradient(135deg,#fff7ed,#f8fafc)] px-4 py-3 text-sm leading-6 text-muted-foreground"
+                          >
+                            {warning}
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  ) : null}
+                </div>
+              ) : null}
+            </BrandCard>
+          ) : null}
         </div>
 
         <div className="space-y-6">
