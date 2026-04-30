@@ -153,6 +153,11 @@ function hashString(value: string) {
 }
 
 function inferTravelers(request: TripGenerationInput, bestFor = "") {
+  if (request.profile?.style === "solo") return 1
+  if (request.profile?.style === "casal") return 2
+  if (request.profile?.style === "familia") return 3
+  if (request.profile?.style === "amigos") return 4
+
   if (request.quizAnswers?.tripStyle === "solo") return 1
   if (request.quizAnswers?.tripStyle === "romantica") return 2
   if (request.quizAnswers?.tripStyle === "familia") return 3
@@ -260,7 +265,12 @@ function resolvePeriodData(request: TripGenerationInput): PeriodData {
 }
 
 function resolveTravelTier(request: TripGenerationInput, bestFor: string) {
+  const priceSensitivity = request.profile?.priceSensitivity
   const budget = request.quizAnswers?.budget
+
+  if (priceSensitivity === "economico") return "economico" as const
+  if (priceSensitivity === "premium") return "premium" as const
+  if (priceSensitivity === "intermediario") return "medio" as const
 
   if (budget === "ate-3000") return "economico" as const
   if (budget === "ate-5000" || budget === "ate-8000") return "medio" as const
@@ -718,6 +728,16 @@ function buildSearchSource(request: TripGenerationInput, isAuthenticated: boolea
 function buildUserPrompt(request: TripGenerationInput) {
   const periodData = resolvePeriodData(request)
   const travelers = inferTravelers(request)
+  const profileLines = request.profile
+    ? [
+        "Perfil complementar informado:",
+        `- estilo complementar: ${request.profile.style ?? "nao informado"}`,
+        `- ritmo: ${request.profile.pace ?? "nao informado"}`,
+        `- preferências: ${request.profile.preferences?.join(", ") || "nao informadas"}`,
+        `- sensibilidade a preço: ${request.profile.priceSensitivity ?? "nao informada"}`,
+        `- voo: ${request.profile.flightPreference ?? "nao informado"}`,
+      ]
+    : []
 
   if (request.origin === "quiz" && request.quizAnswers) {
     return [

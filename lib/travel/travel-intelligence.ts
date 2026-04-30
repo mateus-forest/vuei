@@ -18,8 +18,14 @@ export type UserTravelProfile = {
   prefersCulture: boolean
   prefersBeach: boolean
   prefersSnow: boolean
+  prefersFood: boolean
+  prefersNightlife: boolean
+  prefersShopping: boolean
+  prefersParks: boolean
   prefersLuxury: boolean
   dislikesLongFlights: boolean
+  avoidsConnections: boolean
+  acceptsConnections: boolean
   travelers: number
   durationDays: number
   origin: string
@@ -77,6 +83,11 @@ function average(values: number[]) {
 }
 
 function inferTravelers(request: TripGenerationInput) {
+  if (request.profile?.style === "solo") return 1
+  if (request.profile?.style === "casal") return 2
+  if (request.profile?.style === "familia") return 3
+  if (request.profile?.style === "amigos") return 4
+
   if (request.quizAnswers?.tripStyle === "solo") return 1
   if (request.quizAnswers?.tripStyle === "romantica") return 2
   if (request.quizAnswers?.tripStyle === "familia") return 3
@@ -121,6 +132,15 @@ function inferMonth(request: TripGenerationInput) {
 }
 
 function inferBudgetLevel(request: TripGenerationInput) {
+  switch (request.profile?.priceSensitivity) {
+    case "economico":
+      return "low" as const
+    case "premium":
+      return "high" as const
+    case "intermediario":
+      return "medium" as const
+  }
+
   switch (request.quizAnswers?.budget) {
     case "ate-3000":
       return "low" as const
@@ -138,10 +158,32 @@ function inferBudgetLevel(request: TripGenerationInput) {
 }
 
 function inferTravelStyle(request: TripGenerationInput) {
+  switch (request.profile?.style) {
+    case "casal":
+      return "romantica"
+    case "relaxamento":
+      return "descanso"
+    default:
+      break
+  }
+
+  if (request.profile?.style) {
+    return request.profile.style
+  }
+
   return request.quizAnswers?.tripStyle ?? "equilibrado"
 }
 
 function inferPace(request: TripGenerationInput, durationDays: number) {
+  switch (request.profile?.pace) {
+    case "tranquilo":
+      return "light" as const
+    case "intenso":
+      return "intense" as const
+    case "equilibrado":
+      return "balanced" as const
+  }
+
   const text = normalizeText(request.inputText)
   if (text.includes("sem correria") || text.includes("tranquilo") || text.includes("descanso")) return "light" as const
   if (text.includes("aproveitar tudo") || text.includes("intenso") || durationDays <= 3) return "intense" as const
@@ -227,19 +269,33 @@ export function buildUserTravelProfile(request: TripGenerationInput, destination
   const travelStyle = inferTravelStyle(request)
   const text = normalizeText(request.inputText)
   const vibe = request.quizAnswers?.vibe
+  const preferences = new Set(request.profile?.preferences ?? [])
+  const flightPreference = request.profile?.flightPreference
 
   return {
     budgetLevel: inferBudgetLevel(request),
     travelStyle,
     pace: inferPace(request, durationDays),
     prefersNature:
-      vibe === "natureza" || text.includes("natureza") || text.includes("trilha") || travelStyle === "aventura",
+      preferences.has("natureza") || vibe === "natureza" || text.includes("natureza") || text.includes("trilha") || travelStyle === "aventura",
     prefersCulture:
-      vibe === "cultura" || text.includes("cultura") || text.includes("museu") || travelStyle === "cultural",
-    prefersBeach: vibe === "praia" || vibe === "verao" || text.includes("praia") || text.includes("mar"),
-    prefersSnow: vibe === "inverno" || text.includes("neve") || text.includes("frio") || text.includes("esqui"),
-    prefersLuxury: vibe === "luxo" || travelStyle === "luxo" || text.includes("luxo") || text.includes("premium"),
-    dislikesLongFlights: text.includes("voo curto") || text.includes("sem voo longo") || durationDays <= 4,
+      preferences.has("cultura") || vibe === "cultura" || text.includes("cultura") || text.includes("museu") || travelStyle === "cultural",
+    prefersBeach: preferences.has("praia") || vibe === "praia" || vibe === "verao" || text.includes("praia") || text.includes("mar"),
+    prefersSnow: preferences.has("neve-frio") || vibe === "inverno" || text.includes("neve") || text.includes("frio") || text.includes("esqui"),
+    prefersFood: preferences.has("gastronomia") || text.includes("gastronomia") || text.includes("restaurante"),
+    prefersNightlife: preferences.has("vida-noturna") || text.includes("vida noturna") || text.includes("balada"),
+    prefersShopping: preferences.has("compras") || text.includes("compras") || text.includes("outlet"),
+    prefersParks: preferences.has("parques-atracoes") || text.includes("parques") || text.includes("atracoes"),
+    prefersLuxury:
+      request.profile?.style === "luxo" ||
+      request.profile?.priceSensitivity === "premium" ||
+      vibe === "luxo" ||
+      travelStyle === "luxo" ||
+      text.includes("luxo") ||
+      text.includes("premium"),
+    dislikesLongFlights: flightPreference === "voos-curtos" || text.includes("voo curto") || text.includes("sem voo longo") || durationDays <= 4,
+    avoidsConnections: flightPreference === "evitar-conexoes",
+    acceptsConnections: flightPreference === "aceito-conexoes",
     travelers: inferTravelers(request),
     durationDays,
     origin: inferOrigin(request),
@@ -314,6 +370,10 @@ function calculateTripStyleScore(destinationData: TravelDestinationData, userPro
   if (userProfile.prefersSnow && destinationData.tags.includes("neve")) signals.push(96)
   if (userProfile.prefersNature) signals.push(destinationData.natureScore)
   if (userProfile.prefersCulture) signals.push(destinationData.cultureScore)
+  if (userProfile.prefersFood) signals.push(destinationData.foodScore)
+  if (userProfile.prefersNightlife) signals.push(destinationData.nightlifeScore)
+  if (userProfile.prefersShopping) signals.push(destinationData.walkabilityScore, destinationData.mobilityScore)
+  if (userProfile.prefersParks) signals.push(destinationData.familyScore, destinationData.adventureScore)
   if (userProfile.prefersLuxury) signals.push(destinationData.foodScore, destinationData.safetyScore)
 
   return clampScore(average(signals))
@@ -367,6 +427,7 @@ export function calculateExperienceScore(destinationData: TravelDestinationData,
     destinationData.cultureScore,
     destinationData.mobilityScore,
     destinationData.safetyScore,
+    userProfile.prefersNightlife ? destinationData.nightlifeScore : destinationData.walkabilityScore,
     calculateTripStyleScore(destinationData, userProfile),
   ])
 
@@ -387,6 +448,14 @@ export function calculateRouteComfortScore(destinationData: TravelDestinationDat
 
   if (userProfile.dislikesLongFlights && flightHours > 5) {
     score -= 18
+  }
+
+  if (userProfile.avoidsConnections && flightHours > 6) {
+    score -= 10
+  }
+
+  if (userProfile.acceptsConnections && flightHours > 6) {
+    score += 4
   }
 
   if (userProfile.durationDays <= 4 && flightHours > 8) {

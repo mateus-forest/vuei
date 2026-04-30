@@ -8,6 +8,14 @@ import { heroSuggestions } from "@/lib/constants/trip-suggestions"
 import { getClientSession } from "@/lib/services/session-service"
 import { GradientButton } from "@/components/ui/gradient-button"
 import { BrandCard } from "@/components/ui/brand-card"
+import type {
+  TripProfileFlightPreference,
+  TripProfileInput,
+  TripProfilePace,
+  TripProfilePreference,
+  TripProfilePriceSensitivity,
+  TripProfileStyle,
+} from "@/types/trip"
 
 type AiTripFormProps = {
   placeholder?: string
@@ -21,6 +29,59 @@ type TripGenerationApiResponse =
   | { ok: false; error: string; code?: string }
 
 const FREE_SEARCH_STORAGE_KEY = "free_search_used"
+
+const profileOptions = {
+  style: ["familia", "casal", "amigos", "solo", "trabalho", "luxo", "aventura", "relaxamento"] as const,
+  pace: ["tranquilo", "equilibrado", "intenso"] as const,
+  preferences: ["praia", "natureza", "cultura", "gastronomia", "vida-noturna", "neve-frio", "compras", "parques-atracoes"] as const,
+  priceSensitivity: ["economico", "intermediario", "premium"] as const,
+  flightPreference: ["voos-curtos", "aceito-conexoes", "evitar-conexoes", "nao-importa"] as const,
+}
+
+const profileLabels: Record<
+  TripProfileStyle | TripProfilePace | TripProfilePreference | TripProfilePriceSensitivity | TripProfileFlightPreference,
+  string
+> = {
+  familia: "Família",
+  casal: "Casal",
+  amigos: "Amigos",
+  solo: "Solo",
+  trabalho: "Trabalho",
+  luxo: "Luxo",
+  aventura: "Aventura",
+  relaxamento: "Relaxamento",
+  tranquilo: "Tranquilo",
+  equilibrado: "Equilibrado",
+  intenso: "Intenso",
+  praia: "Praia",
+  natureza: "Natureza",
+  cultura: "Cultura",
+  gastronomia: "Gastronomia",
+  "vida-noturna": "Vida noturna",
+  "neve-frio": "Neve/frio",
+  compras: "Compras",
+  "parques-atracoes": "Parques/atrações",
+  economico: "Econômico",
+  intermediario: "Intermediário",
+  premium: "Premium",
+  "voos-curtos": "Prefiro voos curtos",
+  "aceito-conexoes": "Aceito conexões",
+  "evitar-conexoes": "Evitar conexões",
+  "nao-importa": "Não importa",
+}
+
+function buildProfilePayload(profile: TripProfileInput): TripProfileInput | undefined {
+  const preferences = profile.preferences?.filter(Boolean) ?? []
+  const normalized: TripProfileInput = {
+    style: profile.style,
+    pace: profile.pace,
+    preferences: preferences.length > 0 ? preferences : undefined,
+    priceSensitivity: profile.priceSensitivity,
+    flightPreference: profile.flightPreference,
+  }
+
+  return Object.values(normalized).some(Boolean) ? normalized : undefined
+}
 
 async function readJsonResponse(response: Response) {
   const contentType = response.headers.get("content-type") || ""
@@ -43,6 +104,31 @@ async function readJsonResponse(response: Response) {
   }
 }
 
+function ProfileChoiceButton({
+  active,
+  label,
+  onClick,
+}: {
+  active: boolean
+  label: string
+  onClick: () => void
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={[
+        "rounded-full border px-4 py-2 text-sm transition",
+        active
+          ? "border-[#5de0e6] bg-[linear-gradient(135deg,#5de0e614,#004aad14)] text-foreground shadow-sm"
+          : "border-border/60 bg-white/80 text-muted-foreground hover:border-[#5de0e6]/50",
+      ].join(" ")}
+    >
+      {label}
+    </button>
+  )
+}
+
 export function AiTripForm({
   placeholder = "Ex: Quero viajar para Itália com minha família em julho gastando até R$ 5.000",
   defaultValue = "",
@@ -50,6 +136,9 @@ export function AiTripForm({
   enforceFreeSearchLimit = false,
 }: AiTripFormProps) {
   const [query, setQuery] = useState(defaultValue)
+  const [profile, setProfile] = useState<TripProfileInput>({
+    preferences: [],
+  })
   const [error, setError] = useState("")
   const [selectedSuggestion, setSelectedSuggestion] = useState("")
   const [isSubmitting, setIsSubmitting] = useState(false)
@@ -58,6 +147,7 @@ export function AiTripForm({
   const router = useRouter()
 
   const trimmed = useMemo(() => query.trim(), [query])
+  const profilePayload = useMemo(() => buildProfilePayload(profile), [profile])
 
   useEffect(() => {
     if (!enforceFreeSearchLimit || typeof window === "undefined") return
@@ -92,6 +182,7 @@ export function AiTripForm({
         body: JSON.stringify({
           origin: source,
           input: trimmed,
+          profile: profilePayload,
         }),
       })
 
@@ -136,41 +227,172 @@ export function AiTripForm({
   return (
     <div className="space-y-4">
       <BrandCard glow className="rounded-[28px] p-3 sm:p-4">
-        <div className="flex flex-col gap-3 sm:flex-row">
-          <div className="relative flex-1">
-            <Sparkles className="pointer-events-none absolute left-4 top-5 size-5 text-[#5de0e6]" />
-            <textarea
-              value={query}
-              onChange={(event) => {
-                setQuery(event.target.value)
-                if (selectedSuggestion && event.target.value !== selectedSuggestion) {
-                  setSelectedSuggestion("")
-                }
-              }}
-              placeholder={placeholder}
-              rows={3}
-              className="min-h-[88px] w-full resize-none rounded-[22px] border border-transparent bg-secondary/40 py-4 pl-12 pr-4 text-base text-foreground placeholder:text-muted-foreground focus:border-[#5de0e6]/50 focus:outline-none"
-            />
+        <div className="space-y-4">
+          <div className="flex flex-col gap-3 sm:flex-row">
+            <div className="relative flex-1">
+              <Sparkles className="pointer-events-none absolute left-4 top-5 size-5 text-[#5de0e6]" />
+              <textarea
+                value={query}
+                onChange={(event) => {
+                  setQuery(event.target.value)
+                  if (selectedSuggestion && event.target.value !== selectedSuggestion) {
+                    setSelectedSuggestion("")
+                  }
+                }}
+                placeholder={placeholder}
+                rows={3}
+                className="min-h-[88px] w-full resize-none rounded-[22px] border border-transparent bg-secondary/40 py-4 pl-12 pr-4 text-base text-foreground placeholder:text-muted-foreground focus:border-[#5de0e6]/50 focus:outline-none"
+              />
+            </div>
+            <GradientButton
+              type="button"
+              size="lg"
+              className="h-auto min-h-[88px] px-6 text-base sm:w-auto"
+              onClick={() => void handleSubmit()}
+              disabled={isSubmitting || isPending}
+            >
+              {isSubmitting || isPending ? (
+                <>
+                  <Plane className="size-5 animate-spin" />
+                  Gerando sua viagem...
+                </>
+              ) : (
+                <>
+                  Descobrir viagem
+                  <ArrowRight className="size-5" />
+                </>
+              )}
+            </GradientButton>
           </div>
-          <GradientButton
-            type="button"
-            size="lg"
-            className="h-auto min-h-[88px] px-6 text-base sm:w-auto"
-            onClick={() => void handleSubmit()}
-            disabled={isSubmitting || isPending}
-          >
-            {isSubmitting || isPending ? (
-              <>
-                <Plane className="size-5 animate-spin" />
-                Gerando sua viagem...
-              </>
-            ) : (
-              <>
-                Descobrir viagem
-                <ArrowRight className="size-5" />
-              </>
-            )}
-          </GradientButton>
+
+          <div className="rounded-[24px] border border-border/60 bg-secondary/20 p-4 sm:p-5">
+            <div className="flex flex-col gap-1 sm:flex-row sm:items-end sm:justify-between">
+              <div>
+                <div className="text-sm font-medium text-foreground">Perfil opcional da viagem</div>
+                <div className="text-sm text-muted-foreground">Esses sinais ajudam o VUEI a personalizar melhor a recomendação.</div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setProfile({ preferences: [] })}
+                className="text-left text-xs font-medium text-[#004aad] transition hover:text-[#00357f]"
+              >
+                Limpar preferências
+              </button>
+            </div>
+
+            <div className="mt-5 space-y-5">
+              <div>
+                <div className="mb-3 text-sm font-medium text-foreground">Estilo da viagem</div>
+                <div className="flex flex-wrap gap-2">
+                  {profileOptions.style.map((option) => (
+                    <ProfileChoiceButton
+                      key={option}
+                      active={profile.style === option}
+                      label={profileLabels[option]}
+                      onClick={() =>
+                        setProfile((current) => ({
+                          ...current,
+                          style: current.style === option ? undefined : option,
+                        }))
+                      }
+                    />
+                  ))}
+                </div>
+              </div>
+
+              <div>
+                <div className="mb-3 text-sm font-medium text-foreground">Ritmo da viagem</div>
+                <div className="flex flex-wrap gap-2">
+                  {profileOptions.pace.map((option) => (
+                    <ProfileChoiceButton
+                      key={option}
+                      active={profile.pace === option}
+                      label={profileLabels[option]}
+                      onClick={() =>
+                        setProfile((current) => ({
+                          ...current,
+                          pace: current.pace === option ? undefined : option,
+                        }))
+                      }
+                    />
+                  ))}
+                </div>
+              </div>
+
+              <div>
+                <div className="mb-3 text-sm font-medium text-foreground">Preferências</div>
+                <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-4">
+                  {profileOptions.preferences.map((option) => {
+                    const checked = profile.preferences?.includes(option) ?? false
+                    return (
+                      <label
+                        key={option}
+                        className="flex items-center gap-3 rounded-2xl border border-border/60 bg-white/80 px-3 py-3 text-sm text-foreground transition hover:border-[#5de0e6]/50"
+                      >
+                        <input
+                          type="checkbox"
+                          checked={checked}
+                          onChange={() =>
+                            setProfile((current) => {
+                              const currentPreferences = current.preferences ?? []
+                              return {
+                                ...current,
+                                preferences: checked
+                                  ? currentPreferences.filter((item) => item !== option)
+                                  : [...currentPreferences, option],
+                              }
+                            })
+                          }
+                          className="size-4 rounded border-border/60 text-[#004aad] focus:ring-[#5de0e6]/50"
+                        />
+                        <span>{profileLabels[option]}</span>
+                      </label>
+                    )
+                  })}
+                </div>
+              </div>
+
+              <div className="grid gap-5 lg:grid-cols-2">
+                <div>
+                  <div className="mb-3 text-sm font-medium text-foreground">Sensibilidade a preço</div>
+                  <div className="flex flex-wrap gap-2">
+                    {profileOptions.priceSensitivity.map((option) => (
+                      <ProfileChoiceButton
+                        key={option}
+                        active={profile.priceSensitivity === option}
+                        label={profileLabels[option]}
+                        onClick={() =>
+                          setProfile((current) => ({
+                            ...current,
+                            priceSensitivity: current.priceSensitivity === option ? undefined : option,
+                          }))
+                        }
+                      />
+                    ))}
+                  </div>
+                </div>
+
+                <div>
+                  <div className="mb-3 text-sm font-medium text-foreground">Preferência de voo</div>
+                  <div className="flex flex-wrap gap-2">
+                    {profileOptions.flightPreference.map((option) => (
+                      <ProfileChoiceButton
+                        key={option}
+                        active={profile.flightPreference === option}
+                        label={profileLabels[option]}
+                        onClick={() =>
+                          setProfile((current) => ({
+                            ...current,
+                            flightPreference: current.flightPreference === option ? undefined : option,
+                          }))
+                        }
+                      />
+                    ))}
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
         </div>
       </BrandCard>
 

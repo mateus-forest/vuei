@@ -12,10 +12,21 @@ const quizAnswersSchema = z.object({
   vibe: z.enum(["praia", "inverno", "verao", "cultura", "natureza", "luxo"]),
 })
 
+const tripProfileSchema = z.object({
+  style: z.enum(["familia", "casal", "amigos", "solo", "trabalho", "luxo", "aventura", "relaxamento"]).optional(),
+  pace: z.enum(["tranquilo", "equilibrado", "intenso"]).optional(),
+  preferences: z
+    .array(z.enum(["praia", "natureza", "cultura", "gastronomia", "vida-noturna", "neve-frio", "compras", "parques-atracoes"]))
+    .optional(),
+  priceSensitivity: z.enum(["economico", "intermediario", "premium"]).optional(),
+  flightPreference: z.enum(["voos-curtos", "aceito-conexoes", "evitar-conexoes", "nao-importa"]).optional(),
+})
+
 const generateTripPayloadSchema = z.object({
   origin: z.enum(["busca", "quiz", "sugestao"]).optional(),
   input: z.string().optional(),
   quizAnswers: quizAnswersSchema.optional(),
+  profile: tripProfileSchema.optional(),
 })
 
 function jsonOk(data: unknown, init?: ResponseInit) {
@@ -61,6 +72,7 @@ export async function POST(request: Request) {
           origin,
           inputText: body.input?.trim() || "quero viajar para europa com 5 mil reais",
           quizAnswers: body.quizAnswers,
+          profile: body.profile,
         })
 
         let publicSearchId: string | undefined
@@ -123,6 +135,7 @@ export async function POST(request: Request) {
         origin,
         inputText: body.input?.trim(),
         quizAnswers: body.quizAnswers,
+        profile: body.profile,
         userId: session.userId ?? undefined,
       },
     })

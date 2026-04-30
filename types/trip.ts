@@ -83,10 +83,37 @@ export type QuizAnswer = {
   vibe: "praia" | "inverno" | "verao" | "cultura" | "natureza" | "luxo"
 }
 
+export type TripProfileStyle = "familia" | "casal" | "amigos" | "solo" | "trabalho" | "luxo" | "aventura" | "relaxamento"
+
+export type TripProfilePace = "tranquilo" | "equilibrado" | "intenso"
+
+export type TripProfilePreference =
+  | "praia"
+  | "natureza"
+  | "cultura"
+  | "gastronomia"
+  | "vida-noturna"
+  | "neve-frio"
+  | "compras"
+  | "parques-atracoes"
+
+export type TripProfilePriceSensitivity = "economico" | "intermediario" | "premium"
+
+export type TripProfileFlightPreference = "voos-curtos" | "aceito-conexoes" | "evitar-conexoes" | "nao-importa"
+
+export type TripProfileInput = {
+  style?: TripProfileStyle
+  pace?: TripProfilePace
+  preferences?: TripProfilePreference[]
+  priceSensitivity?: TripProfilePriceSensitivity
+  flightPreference?: TripProfileFlightPreference
+}
+
 export type TripGenerationInput = {
   origin: TripOrigin
   inputText?: string
   quizAnswers?: QuizAnswer
+  profile?: TripProfileInput
   userId?: string
 }
 
