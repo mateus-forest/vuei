@@ -2,26 +2,59 @@
 
 import type { TripResult } from "@/types/trip"
 
+type PdfBreakdownItem = {
+  label: string
+  total: string
+  perPerson: string
+}
+
+type PdfDetailedDay = {
+  title: string
+  description: string
+}
+
 export function ItineraryPdfTemplate({
   destination,
   estimatedCost,
   originSubtitle,
   periodLabel,
+  startDate,
+  endDate,
   durationLabel,
+  durationDays,
+  travelersLabel,
+  selectedVariantLabel,
+  costPerPerson,
+  currency,
+  breakdown,
+  assumptions,
   summary,
   itinerary,
   detailedItinerary,
-  tips,
+  insights,
+  whyThisTrip,
+  attentionPoints,
 }: {
   destination: TripResult["destination"]
   estimatedCost: TripResult["estimatedCost"]
   originSubtitle: string
   periodLabel?: TripResult["periodLabel"]
+  startDate?: string
+  endDate?: string
   durationLabel?: TripResult["durationLabel"]
+  durationDays: number
+  travelersLabel: string
+  selectedVariantLabel: string
+  costPerPerson: string
+  currency: "BRL"
+  breakdown: PdfBreakdownItem[]
+  assumptions: string
   summary: string
   itinerary: TripResult["itinerary"]
-  detailedItinerary: string[]
-  tips: TripResult["tips"]
+  detailedItinerary: PdfDetailedDay[]
+  insights: string[]
+  whyThisTrip: string[]
+  attentionPoints: string[]
 }) {
   const today = new Intl.DateTimeFormat("pt-BR", {
     day: "2-digit",
@@ -57,6 +90,10 @@ export function ItineraryPdfTemplate({
       .replaceAll("\u00e2\u20ac\u201d", "\u2014")
   }
 
+  const safePeriod = periodLabel ?? "Per\u00edodo n\u00e3o informado"
+  const safeDates = startDate && endDate ? `${startDate} a ${endDate}` : startDate ?? endDate ?? "Nao informado"
+  const safeDuration = durationLabel ?? `${durationDays} ${durationDays === 1 ? "dia" : "dias"}`
+
   const printStyles = {
     page: {
       width: "794px",
@@ -64,32 +101,7 @@ export function ItineraryPdfTemplate({
       color: "#17324d",
       fontFamily: "Arial, Helvetica, sans-serif",
       paddingBottom: "28px",
-      ["--background" as "--background"]: "#ffffff",
-      ["--foreground" as "--foreground"]: "#17324d",
-      ["--card" as "--card"]: "#ffffff",
-      ["--card-foreground" as "--card-foreground"]: "#17324d",
-      ["--popover" as "--popover"]: "#ffffff",
-      ["--popover-foreground" as "--popover-foreground"]: "#17324d",
-      ["--primary" as "--primary"]: "#004aad",
-      ["--primary-foreground" as "--primary-foreground"]: "#ffffff",
-      ["--secondary" as "--secondary"]: "#f7fafc",
-      ["--secondary-foreground" as "--secondary-foreground"]: "#253b56",
-      ["--muted" as "--muted"]: "#f8fafc",
-      ["--muted-foreground" as "--muted-foreground"]: "#42566f",
-      ["--accent" as "--accent"]: "#eaf8ff",
-      ["--accent-foreground" as "--accent-foreground"]: "#15324f",
-      ["--border" as "--border"]: "#e3ebf4",
-      ["--input" as "--input"]: "#e3ebf4",
-      ["--ring" as "--ring"]: "rgba(0,0,0,0)",
-      ["--sidebar" as "--sidebar"]: "#ffffff",
-      ["--sidebar-foreground" as "--sidebar-foreground"]: "#17324d",
-      ["--sidebar-primary" as "--sidebar-primary"]: "#004aad",
-      ["--sidebar-primary-foreground" as "--sidebar-primary-foreground"]: "#ffffff",
-      ["--sidebar-accent" as "--sidebar-accent"]: "#f7fafc",
-      ["--sidebar-accent-foreground" as "--sidebar-accent-foreground"]: "#17324d",
-      ["--sidebar-border" as "--sidebar-border"]: "#e3ebf4",
-      ["--sidebar-ring" as "--sidebar-ring"]: "rgba(0,0,0,0)",
-    } as const,
+    },
     hero: {
       position: "relative" as const,
       padding: "34px 36px 28px",
@@ -172,17 +184,16 @@ export function ItineraryPdfTemplate({
       fontSize: "18px",
       fontWeight: 700,
     },
-    metaLabel: {
-      color: "#8293a8",
-      fontSize: "10px",
-      textTransform: "uppercase" as const,
-      letterSpacing: "0.08em",
-      marginBottom: "6px",
+    paragraph: {
+      margin: 0,
+      color: "#42566f",
+      fontSize: "13px",
+      lineHeight: 1.7,
     },
     metaGrid: {
       display: "grid",
-      gridTemplateColumns: "1.2fr 1fr 1.2fr",
-      gap: "14px",
+      gridTemplateColumns: "1fr 1fr 1fr",
+      gap: "12px",
       marginTop: "14px",
     },
     metaItem: {
@@ -195,18 +206,14 @@ export function ItineraryPdfTemplate({
       color: "#8b9aad",
       fontSize: "11px",
       marginBottom: "6px",
+      textTransform: "uppercase" as const,
+      letterSpacing: "0.08em",
     },
     metaValue: {
       color: "#17324d",
       fontSize: "14px",
       fontWeight: 700,
       lineHeight: 1.4,
-    },
-    paragraph: {
-      margin: 0,
-      color: "#42566f",
-      fontSize: "13px",
-      lineHeight: 1.7,
     },
     itineraryGrid: {
       display: "grid",
@@ -273,29 +280,23 @@ export function ItineraryPdfTemplate({
       fontSize: "12px",
       lineHeight: 1.65,
     },
-    tipsCard: {
-      background: "#eaf8ff",
-      border: "1px solid #b9ebff",
-      borderRadius: "16px",
-      padding: "16px",
-      marginBottom: "14px",
-      marginTop: "18px",
-      breakInside: "avoid" as const,
-      pageBreakInside: "avoid" as const,
-    },
-    tipsList: {
+    list: {
       margin: 0,
       padding: 0,
       listStyle: "none",
+      display: "grid",
+      gap: "10px",
     },
-    tipItem: {
+    listItem: {
       display: "flex",
       gap: "10px",
       alignItems: "flex-start",
-      marginBottom: "10px",
       color: "#29506e",
       fontSize: "12px",
       lineHeight: 1.6,
+      background: "#f7fafc",
+      borderRadius: "12px",
+      padding: "12px",
     },
     footer: {
       display: "flex",
@@ -322,7 +323,7 @@ export function ItineraryPdfTemplate({
 
       <div style={printStyles.body}>
         <section data-pdf-section="meta" style={printStyles.card}>
-          <div style={printStyles.metaLabel}>{normalizePdfText(originSubtitle)}</div>
+          <div style={printStyles.metaTitle}>{normalizePdfText(originSubtitle)}</div>
           <p style={{ ...printStyles.paragraph, fontStyle: "italic" }}>{`"${normalizePdfText(summary)}"`}</p>
 
           <div style={printStyles.metaGrid}>
@@ -331,28 +332,85 @@ export function ItineraryPdfTemplate({
               <div style={printStyles.metaValue}>{destination}</div>
             </div>
             <div style={printStyles.metaItem}>
-              <div style={printStyles.metaTitle}>Custo estimado</div>
+              <div style={printStyles.metaTitle}>Periodo</div>
+              <div style={printStyles.metaValue}>{safePeriod}</div>
+            </div>
+            <div style={printStyles.metaItem}>
+              <div style={printStyles.metaTitle}>Datas</div>
+              <div style={printStyles.metaValue}>{safeDates}</div>
+            </div>
+          </div>
+
+          <div style={printStyles.metaGrid}>
+            <div style={printStyles.metaItem}>
+              <div style={printStyles.metaTitle}>Duracao</div>
+              <div style={printStyles.metaValue}>{safeDuration}</div>
+            </div>
+            <div style={printStyles.metaItem}>
+              <div style={printStyles.metaTitle}>Viajantes</div>
+              <div style={printStyles.metaValue}>{travelersLabel}</div>
+            </div>
+            <div style={printStyles.metaItem}>
+              <div style={printStyles.metaTitle}>Opcao</div>
+              <div style={printStyles.metaValue}>{selectedVariantLabel}</div>
+            </div>
+          </div>
+
+          <div style={printStyles.metaGrid}>
+            <div style={printStyles.metaItem}>
+              <div style={printStyles.metaTitle}>Custo total</div>
               <div style={printStyles.metaValue}>{estimatedCost}</div>
             </div>
             <div style={printStyles.metaItem}>
-              <div style={printStyles.metaTitle}>Período</div>
-              <div style={printStyles.metaValue}>{periodLabel ?? durationLabel ?? "Período não informado"}</div>
+              <div style={printStyles.metaTitle}>Por pessoa</div>
+              <div style={printStyles.metaValue}>{costPerPerson}</div>
             </div>
+            <div style={printStyles.metaItem}>
+              <div style={printStyles.metaTitle}>Moeda</div>
+              <div style={printStyles.metaValue}>{currency}</div>
+            </div>
+          </div>
+        </section>
+
+        <section data-pdf-section="costs" style={printStyles.card}>
+          <div style={printStyles.sectionTitleRow}>
+            <span style={printStyles.sectionDot}>1</span>
+            <h2 style={printStyles.sectionTitle}>Custos e premissas</h2>
+          </div>
+
+          <div style={{ display: "grid", gap: "10px" }}>
+            {breakdown.map((item) => (
+              <div
+                key={item.label}
+                style={{ display: "flex", justifyContent: "space-between", gap: "12px", borderRadius: "12px", background: "#f7fafc", padding: "12px" }}
+              >
+                <div>
+                  <div style={printStyles.fullDayTitle}>{item.label}</div>
+                  <div style={printStyles.fullDayText}>{item.perPerson} por pessoa</div>
+                </div>
+                <div style={{ ...printStyles.metaValue, textAlign: "right" as const }}>{item.total}</div>
+              </div>
+            ))}
+          </div>
+
+          <div style={{ ...printStyles.metaItem, marginTop: "12px" }}>
+            <div style={printStyles.metaTitle}>Premissas usadas</div>
+            <div style={printStyles.paragraph}>{normalizePdfText(assumptions)}</div>
           </div>
         </section>
 
         <section data-pdf-section="summary" style={printStyles.card}>
           <div style={printStyles.sectionTitleRow}>
-            <span style={printStyles.sectionDot}>1</span>
-            <h2 style={printStyles.sectionTitle}>Resumo da Viagem</h2>
+            <span style={printStyles.sectionDot}>2</span>
+            <h2 style={printStyles.sectionTitle}>Resumo da viagem</h2>
           </div>
           <p style={printStyles.paragraph}>{normalizePdfText(summary)}</p>
         </section>
 
         <section data-pdf-section="short-itinerary" style={printStyles.card}>
           <div style={printStyles.sectionTitleRow}>
-            <span style={printStyles.sectionDot}>2</span>
-            <h2 style={printStyles.sectionTitle}>Roteiro Resumido</h2>
+            <span style={printStyles.sectionDot}>3</span>
+            <h2 style={printStyles.sectionTitle}>Roteiro resumido</h2>
           </div>
           <div style={printStyles.itineraryGrid}>
             {itinerary.map((day, index) => (
@@ -366,32 +424,62 @@ export function ItineraryPdfTemplate({
 
         <section data-pdf-section="full-itinerary" style={printStyles.card}>
           <div style={printStyles.sectionTitleRow}>
-            <span style={printStyles.sectionDot}>3</span>
-            <h2 style={printStyles.sectionTitle}>Roteiro Completo</h2>
+            <span style={printStyles.sectionDot}>4</span>
+            <h2 style={printStyles.sectionTitle}>Roteiro completo</h2>
           </div>
           <div>
             {detailedItinerary.map((day, index) => (
-              <div key={day} style={printStyles.fullDay}>
+              <div key={`${day.title}-${day.description}`} style={printStyles.fullDay}>
                 <span style={printStyles.fullDayIcon}>{index + 1}</span>
                 <div>
-                  <h3 style={printStyles.fullDayTitle}>{`Dia ${index + 1}`}</h3>
-                  <p style={printStyles.fullDayText}>{normalizePdfText(day)}</p>
+                  <h3 style={printStyles.fullDayTitle}>{normalizePdfText(day.title)}</h3>
+                  <p style={printStyles.fullDayText}>{normalizePdfText(day.description)}</p>
                 </div>
               </div>
             ))}
           </div>
         </section>
 
-        <section data-pdf-section="tips" style={printStyles.tipsCard}>
+        <section data-pdf-section="insights" style={printStyles.card}>
           <div style={printStyles.sectionTitleRow}>
-            <span style={printStyles.sectionDot}>4</span>
-            <h2 style={printStyles.sectionTitle}>Dicas importantes</h2>
+            <span style={printStyles.sectionDot}>5</span>
+            <h2 style={printStyles.sectionTitle}>Insights da opcao escolhida</h2>
           </div>
-          <ul style={printStyles.tipsList}>
-            {tips.map((tip) => (
-              <li key={tip} style={printStyles.tipItem}>
+          <ul style={printStyles.list}>
+            {insights.map((item) => (
+              <li key={item} style={printStyles.listItem}>
                 <span style={printStyles.itemNumber}>{"\u2022"}</span>
-                <span>{normalizePdfText(tip)}</span>
+                <span>{normalizePdfText(item)}</span>
+              </li>
+            ))}
+          </ul>
+        </section>
+
+        <section data-pdf-section="why-this-trip" style={printStyles.card}>
+          <div style={printStyles.sectionTitleRow}>
+            <span style={printStyles.sectionDot}>6</span>
+            <h2 style={printStyles.sectionTitle}>Por que essa viagem faz sentido</h2>
+          </div>
+          <ul style={printStyles.list}>
+            {whyThisTrip.map((item) => (
+              <li key={item} style={printStyles.listItem}>
+                <span style={printStyles.itemNumber}>{"\u2022"}</span>
+                <span>{normalizePdfText(item)}</span>
+              </li>
+            ))}
+          </ul>
+        </section>
+
+        <section data-pdf-section="attention-points" style={printStyles.card}>
+          <div style={printStyles.sectionTitleRow}>
+            <span style={printStyles.sectionDot}>7</span>
+            <h2 style={printStyles.sectionTitle}>Pontos de atencao</h2>
+          </div>
+          <ul style={printStyles.list}>
+            {attentionPoints.map((item) => (
+              <li key={item} style={{ ...printStyles.listItem, background: "#fff7ed" }}>
+                <span style={printStyles.itemNumber}>{"\u2022"}</span>
+                <span>{normalizePdfText(item)}</span>
               </li>
             ))}
           </ul>
@@ -399,11 +487,14 @@ export function ItineraryPdfTemplate({
 
         <section data-pdf-section="final-notes" style={printStyles.card}>
           <div style={printStyles.sectionTitleRow}>
-            <span style={printStyles.sectionDot}>5</span>
-            <h2 style={printStyles.sectionTitle}>{"Observa\u00e7\u00f5es finais"}</h2>
+            <span style={printStyles.sectionDot}>8</span>
+            <h2 style={printStyles.sectionTitle}>Observacoes finais</h2>
           </div>
           <p style={printStyles.paragraph}>
-            {"Este roteiro foi criado especialmente para voc\u00ea com base nas suas prefer\u00eancias. Aproveite cada momento dessa experi\u00eancia \u00fanica!"}
+            Este roteiro foi criado especialmente para voce com base nas suas preferencias. Aproveite cada momento dessa experiencia unica.
+          </p>
+          <p style={{ ...printStyles.paragraph, marginTop: "10px" }}>
+            Os valores sao estimativas e podem variar conforme disponibilidade, cambio, antecedencia e periodo.
           </p>
         </section>
       </div>

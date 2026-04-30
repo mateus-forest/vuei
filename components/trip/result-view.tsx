@@ -38,6 +38,29 @@ type TripVariant = {
   periodItinerary: DayPeriodPlan[]
 }
 
+type CompleteTripSummary = {
+  destination: string
+  periodLabel: string
+  startDate?: string
+  endDate?: string
+  durationLabel: string
+  durationDays: number
+  travelersLabel: string
+  travelersCount: number
+  selectedVariantLabel: string
+  estimatedCost: string
+  costPerPerson: string
+  currency: "BRL"
+  breakdown: Array<{ label: string; total: string; perPerson: string }>
+  assumptions: string
+  shortItinerary: string[]
+  fullItinerary: Array<{ title: string; description: string }>
+  insights: string[]
+  whyThisTrip: string[]
+  attentionPoints: string[]
+  summary: string
+}
+
 function InlineBadge({ children, className }: { children: ReactNode; className?: string }) {
   return (
     <div
@@ -324,6 +347,70 @@ function buildOriginSubtitle(source: string, suggestion: string, input: string) 
   return `Baseado na sua busca: ${input}`
 }
 
+function buildCompleteTripSummary({
+  result,
+  variant,
+  travelersCount,
+  durationDays,
+  periodLabel,
+}: {
+  result: TripResult
+  variant: TripVariant
+  travelersCount: number
+  durationDays: number
+  periodLabel: string
+}): CompleteTripSummary {
+  const fullItinerarySource =
+    variant.periodItinerary.length > 0
+      ? variant.periodItinerary.map((day, index) => ({
+          title: day.title || `Dia ${index + 1}`,
+          description: [`Manha: ${day.morning}`, `Tarde: ${day.afternoon}`, `Noite: ${day.night}`].join(" "),
+        }))
+      : (result.fullItinerary ?? buildDetailedItinerary(result)).filter(Boolean).map((day, index) => ({
+          title: result.itinerary[index] ?? `Dia ${index + 1}`,
+          description: day,
+        }))
+
+  const whyThisTrip = [
+    result.intelligence?.explanation?.summary,
+    result.intelligence?.explanation?.strongestPoint,
+    ...(result.intelligence?.explanation?.reasons ?? []),
+  ].filter(Boolean) as string[]
+
+  const attentionPoints = [
+    result.intelligence?.explanation?.attentionPoint,
+    ...(result.intelligence?.explanation?.warnings ?? []),
+    "Os valores sao estimativas e podem variar conforme disponibilidade, cambio, antecedencia e periodo.",
+  ].filter(Boolean) as string[]
+
+  return {
+    destination: result.destination || "Destino sugerido",
+    periodLabel,
+    startDate: result.startDate ? formatDateDisplay(result.startDate) : undefined,
+    endDate: result.endDate ? formatDateDisplay(result.endDate) : undefined,
+    durationLabel: formatDurationDisplay(result, durationDays),
+    durationDays: result.durationDays ?? durationDays,
+    travelersLabel: formatTravelerLabel(travelersCount),
+    travelersCount,
+    selectedVariantLabel: variant.title,
+    estimatedCost: result.estimatedCost || "R$ 0",
+    costPerPerson: formatPrice(Math.max(300, Math.round(parsePrice(result.estimatedCost || "0") / Math.max(1, travelersCount)))),
+    currency: "BRL",
+    breakdown: variant.breakdown.map((item) => ({
+      label: item.label,
+      total: formatPrice(item.value),
+      perPerson: formatPrice(Math.max(100, Math.round(item.value / Math.max(1, travelersCount)))),
+    })),
+    assumptions: result.context?.trim() || variant.insight,
+    shortItinerary: result.itinerary.filter(Boolean),
+    fullItinerary: fullItinerarySource,
+    insights: (result.tips ?? []).filter(Boolean),
+    whyThisTrip,
+    attentionPoints,
+    summary: result.summary?.trim() || "Encontramos uma sugestao pronta para comparar melhor custo, ritmo e conforto.",
+  }
+}
+
 function getConfidenceText(confidence?: "high" | "medium" | "low") {
   if (confidence === "high") {
     return "Usamos dados mais especificos para esse destino, deixando a leitura mais precisa."
@@ -511,6 +598,17 @@ export function ResultView({
   const summaryText = activeResult.summary?.trim() || "Encontramos uma sugestao pronta para comparar melhor custo, ritmo e conforto."
   const contextText = activeResult.context?.trim() || "A opcao escolhida equilibra custo, experiencia e praticidade para a viagem."
   const bestForText = activeResult.bestFor?.trim() || "viagem flexivel"
+  const completeTripSummary = useMemo(
+    () =>
+      buildCompleteTripSummary({
+        result: activeResult,
+        variant: activeVariant,
+        travelersCount,
+        durationDays: daysCount,
+        periodLabel: tripPeriodText,
+      }),
+    [activeResult, activeVariant, travelersCount, daysCount, tripPeriodText],
+  )
 
   const originSubtitle = buildOriginSubtitle(source, suggestion, input)
 
@@ -695,28 +793,26 @@ export function ResultView({
 
             <ExpandableSection value="full-itinerary" title="Ver roteiro completo">
               <div className="space-y-3 text-sm leading-6 text-muted-foreground">
-                {activePeriodItinerary.length > 0
-                  ? activePeriodItinerary.map((day) => (
-                      <div key={`${day.title}-expanded`} className="rounded-[22px] border border-border/60 bg-secondary/15 p-4">
-                        <div className="font-medium text-foreground">{day.title}</div>
-                        <div className="mt-3 grid gap-2">
-                          <div>
-                            <span className="font-medium text-foreground">Manha:</span> {day.morning}
-                          </div>
-                          <div>
-                            <span className="font-medium text-foreground">Tarde:</span> {day.afternoon}
-                          </div>
-                          <div>
-                            <span className="font-medium text-foreground">Noite:</span> {day.night}
-                          </div>
-                        </div>
-                      </div>
-                    ))
-                  : activeDetailedItinerary.map((day) => (
-                      <div key={day} className="rounded-2xl bg-secondary/35 px-4 py-3">
-                        {day}
-                      </div>
-                    ))}
+                <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                  <div className="text-sm text-muted-foreground">
+                    {completeTripSummary.selectedVariantLabel} • {completeTripSummary.estimatedCost} • {completeTripSummary.costPerPerson} por pessoa
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => void handleDownload()}
+                    className="inline-flex items-center justify-center gap-2 rounded-2xl border border-border/60 bg-white/80 px-4 py-3 text-sm font-medium text-foreground transition hover:border-[#5de0e6]/60"
+                  >
+                    <Download className="size-4 text-[#004aad]" />
+                    Baixar roteiro
+                  </button>
+                </div>
+
+                {completeTripSummary.fullItinerary.map((day) => (
+                  <div key={`${day.title}-${day.description}`} className="rounded-[22px] border border-border/60 bg-secondary/15 p-4">
+                    <div className="font-medium text-foreground">{day.title}</div>
+                    <div className="mt-3">{day.description}</div>
+                  </div>
+                ))}
               </div>
             </ExpandableSection>
 
@@ -1140,15 +1236,26 @@ export function ResultView({
       >
         <div ref={pdfTemplateRef}>
           <ItineraryPdfTemplate
-            destination={activeResult.destination}
-            estimatedCost={activeResult.estimatedCost}
+            destination={completeTripSummary.destination}
+            estimatedCost={completeTripSummary.estimatedCost}
             originSubtitle={originSubtitle}
-            periodLabel={activeResult.periodLabel ?? tripPeriodText}
-            durationLabel={activeResult.durationLabel ?? durationText}
-            summary={activeResult.summary}
-            itinerary={activeResult.itinerary}
-            detailedItinerary={activeDetailedItinerary}
-            tips={activeResult.tips}
+            periodLabel={completeTripSummary.periodLabel}
+            startDate={completeTripSummary.startDate}
+            endDate={completeTripSummary.endDate}
+            durationLabel={completeTripSummary.durationLabel}
+            durationDays={completeTripSummary.durationDays}
+            travelersLabel={completeTripSummary.travelersLabel}
+            selectedVariantLabel={completeTripSummary.selectedVariantLabel}
+            costPerPerson={completeTripSummary.costPerPerson}
+            currency={completeTripSummary.currency}
+            breakdown={completeTripSummary.breakdown}
+            assumptions={completeTripSummary.assumptions}
+            summary={completeTripSummary.summary}
+            itinerary={completeTripSummary.shortItinerary}
+            detailedItinerary={completeTripSummary.fullItinerary}
+            insights={completeTripSummary.insights}
+            whyThisTrip={completeTripSummary.whyThisTrip}
+            attentionPoints={completeTripSummary.attentionPoints}
           />
         </div>
       </div>
