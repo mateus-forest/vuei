@@ -6,6 +6,7 @@ import { ArrowLeftRight, Compass, CreditCard, Download, Map, Sparkles, Wallet } 
 import { ItineraryPdfTemplate } from "@/components/trip/itinerary-pdf-template"
 import { BrandCard } from "@/components/ui/brand-card"
 import { GradientButton } from "@/components/ui/gradient-button"
+import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion"
 import {
   Dialog,
   DialogContent,
@@ -18,6 +19,7 @@ import type { TripResult } from "@/types/trip"
 import { cn } from "@/lib/utils"
 
 type VariantId = "economico" | "intermediario" | "premium"
+type ScoreLabelType = "compatibility" | "cost" | "climate" | "crowd" | "route"
 
 type DayPeriodPlan = {
   title: string
@@ -55,7 +57,7 @@ function buildDetailedItinerary(result: TripResult) {
     result.itinerary.map((day, index) => {
       const complements = [
         `Organize a chegada, os deslocamentos principais e um primeiro contato com ${result.destination}.`,
-        "Reserve este período para aproveitar a experiência central da viagem com mais calma e menos correria.",
+        "Reserve este periodo para aproveitar a experiencia central da viagem com mais calma e menos correria.",
         "Use o dia para incluir um passeio complementar e manter o ritmo da viagem leve.",
         "Feche o roteiro com tempo para compras, gastronomia local ou retorno sem pressa.",
       ]
@@ -82,18 +84,9 @@ function formatPrice(value: number) {
 function inferTravelers(bestFor: string) {
   const normalized = bestFor.toLowerCase()
 
-  if (normalized.includes("solo")) {
-    return 1
-  }
-
-  if (normalized.includes("fam")) {
-    return 3
-  }
-
-  if (normalized.includes("casal") || normalized.includes("dupla")) {
-    return 2
-  }
-
+  if (normalized.includes("solo")) return 1
+  if (normalized.includes("fam")) return 3
+  if (normalized.includes("casal") || normalized.includes("dupla")) return 2
   return 2
 }
 
@@ -122,7 +115,7 @@ function buildBreakdown(total: number, tier: VariantId) {
         ? [0.28, 0.36, 0.14, 0.08, 0.14]
         : [0.3, 0.32, 0.15, 0.09, 0.14]
 
-  const labels = ["Passagens", "Hospedagem", "Alimentação", "Transporte", "Passeios"]
+  const labels = ["Passagens", "Hospedagem", "Alimentacao", "Transporte", "Passeios"]
   const values = ratios.map((ratio) => roundCurrency(total * ratio))
   const adjustment = total - values.reduce((sum, value) => sum + value, 0)
   values[1] += adjustment
@@ -136,19 +129,19 @@ function buildBreakdown(total: number, tier: VariantId) {
 function buildPeriodItinerary(result: TripResult, detailedItinerary: string[], variantId: VariantId): DayPeriodPlan[] {
   const momentsByVariant: Record<VariantId, { morning: string; afternoon: string; night: string }> = {
     economico: {
-      morning: `Comece o dia em ${result.destination} com deslocamentos práticos e agenda objetiva.`,
-      afternoon: "Priorize o passeio central do destino com logística simplificada e boas paradas.",
-      night: "Finalize com jantar em área acessível e ritmo mais enxuto para controlar custos.",
+      morning: `Comece o dia em ${result.destination} com deslocamentos praticos e agenda objetiva.`,
+      afternoon: "Priorize o passeio central do destino com logistica simplificada e boas paradas.",
+      night: "Finalize com jantar em area acessivel e ritmo mais enxuto para controlar custos.",
     },
     intermediario: {
       morning: `Inicie o dia em ${result.destination} com agenda equilibrada e tempo para explorar com calma.`,
-      afternoon: "Aproveite a experiência principal do destino com deslocamentos confortáveis e pausas bem distribuídas.",
+      afternoon: "Aproveite a experiencia principal do destino com deslocamentos confortaveis e pausas bem distribuidas.",
       night: "Feche o dia com boa gastronomia local e uma noite leve para manter o ritmo da viagem.",
     },
     premium: {
-      morning: `Comece o dia em ${result.destination} com mais conforto, deslocamentos suaves e experiência bem organizada.`,
-      afternoon: "Aprofunde os passeios principais com mais conveniência, tempo de pausa e agenda fluida.",
-      night: "Encerramento com jantar especial, caminhada agradável ou experiência noturna mais refinada.",
+      morning: `Comece o dia em ${result.destination} com mais conforto, deslocamentos suaves e experiencia bem organizada.`,
+      afternoon: "Aprofunde os passeios principais com mais conveniencia, tempo de pausa e agenda fluida.",
+      night: "Encerramento com jantar especial, caminhada agradavel ou experiencia noturna mais refinada.",
     },
   }
 
@@ -172,24 +165,24 @@ function buildTripVariants(result: TripResult, currentCost: number) {
   const variants: Array<{ id: VariantId; title: string; total: number; insight: string }> = [
     {
       id: "economico",
-      title: "Econômico",
+      title: "Economico",
       total: roundCurrency(Math.max(safeBaseCost - 1200, 1200)),
       insight:
-        "Essa opção reduz custos priorizando hospedagens mais econômicas e transporte simplificado, mantendo as principais experiências do destino.",
+        "Prioriza o essencial da viagem com hospedagem mais enxuta, logistica simples e custo menor para comparar com clareza.",
     },
     {
       id: "intermediario",
-      title: "Intermediário",
+      title: "Intermediario",
       total: roundCurrency(safeBaseCost),
       insight:
-        "Essa opção equilibra conforto, localização e experiências principais, sem elevar demais o investimento total da viagem.",
+        "Equilibra conforto, localizacao e experiencias centrais sem elevar demais o investimento total da viagem.",
     },
     {
       id: "premium",
       title: "Premium",
       total: roundCurrency(Math.min(safeBaseCost + 2200, 18000)),
       insight:
-        "Essa opção aumenta conforto e conveniência com hospedagem melhor localizada, deslocamentos mais fluidos e experiências mais completas.",
+        "Aumenta conforto e conveniencia com hospedagem melhor localizada, deslocamentos mais fluidos e agenda mais completa.",
     },
   ]
 
@@ -197,26 +190,26 @@ function buildTripVariants(result: TripResult, currentCost: number) {
     const periodItinerary = buildPeriodItinerary(result, baseDetailedItinerary, variant.id)
     const tipsByVariant: Record<VariantId, string[]> = {
       economico: [
-        "Hospedagens econômicas em áreas bem conectadas ajudam a controlar o orçamento.",
+        "Hospedagens economicas em areas bem conectadas ajudam a controlar o orcamento.",
         "Concentrar passeios principais reduz deslocamentos e gastos extras.",
-        "Viajar fora da alta temporada costuma melhorar bastante o custo-benefício.",
+        "Viajar fora da alta temporada costuma melhorar bastante o custo-beneficio.",
       ],
       intermediario: [
-        "Um roteiro equilibrado combina boa localização, conforto e agenda sem correria.",
-        "Reservar com antecedência ajuda a manter o custo previsível.",
-        "Vale ajustar os dias centrais para encaixar experiências mais completas.",
+        "Um roteiro equilibrado combina boa localizacao, conforto e agenda sem correria.",
+        "Reservar com antecedencia ajuda a manter o custo previsivel.",
+        "Vale ajustar os dias centrais para encaixar experiencias mais completas.",
       ],
       premium: [
-        "Hospedagens centrais e deslocamentos mais confortáveis aumentam a fluidez da viagem.",
-        "Reservar experiências concorridas antes da viagem melhora disponibilidade.",
-        "Um roteiro com pausas maiores deixa a experiência mais agradável e sofisticada.",
+        "Hospedagens centrais e deslocamentos mais confortaveis aumentam a fluidez da viagem.",
+        "Reservar experiencias concorridas antes da viagem melhora disponibilidade.",
+        "Um roteiro com pausas maiores deixa a experiencia mais agradavel e sofisticada.",
       ],
     }
 
     const summaryByVariant: Record<VariantId, string> = {
-      economico: "Versão mais enxuta da viagem, priorizando boa experiência com orçamento controlado.",
-      intermediario: "Versão equilibrada da viagem, combinando conforto, praticidade e experiências centrais.",
-      premium: "Versão mais completa da viagem, com mais conforto, ritmo fluido e melhor conveniência.",
+      economico: "Versao mais enxuta da viagem, priorizando boa experiencia com orcamento controlado.",
+      intermediario: "Versao equilibrada da viagem, combinando conforto, praticidade e experiencias centrais.",
+      premium: "Versao mais completa da viagem, com mais conforto, ritmo fluido e melhor conveniencia.",
     }
 
     const resultForVariant: TripResult = {
@@ -226,7 +219,7 @@ function buildTripVariants(result: TripResult, currentCost: number) {
       context: variant.insight,
       tips: tipsByVariant[variant.id],
       fullItinerary: periodItinerary.map(
-        (day) => `${day.title}. Manhã: ${day.morning} Tarde: ${day.afternoon} Noite: ${day.night}`,
+        (day) => `${day.title}. Manha: ${day.morning} Tarde: ${day.afternoon} Noite: ${day.night}`,
       ),
     }
 
@@ -239,22 +232,140 @@ function buildTripVariants(result: TripResult, currentCost: number) {
   })
 }
 
-function getCompatibilityLabel(score: number) {
-  if (score <= 39) return "Baixa compatibilidade"
-  if (score <= 69) return "Boa compatibilidade"
-  return "Alta compatibilidade"
+function getScoreLabel(type: ScoreLabelType, score: number) {
+  if (type === "compatibility") {
+    if (score <= 39) return "Baixa"
+    if (score <= 69) return "Boa"
+    return "Alta"
+  }
+
+  if (type === "cost") {
+    if (score <= 30) return "Caro"
+    if (score <= 60) return "Razoavel"
+    return "Economico"
+  }
+
+  if (type === "climate") {
+    if (score <= 39) return "Desfavoravel"
+    if (score <= 69) return "Ok"
+    return "Bom"
+  }
+
+  if (type === "crowd") {
+    if (score <= 30) return "Tranquila"
+    if (score <= 70) return "Moderada"
+    return "Alta"
+  }
+
+  if (score <= 39) return "Cansativa"
+  if (score <= 69) return "Boa"
+  return "Confortavel"
 }
 
-function getAffordabilityLabel(score: number) {
-  if (score <= 30) return "Caro"
-  if (score <= 60) return "Razoável"
-  return "Econômico"
+function formatDateDisplay(value?: string) {
+  if (!value?.trim()) return ""
+
+  const trimmed = value.trim()
+  if (/^\d{4}-\d{2}-\d{2}$/.test(trimmed)) {
+    const [year, month, day] = trimmed.split("-")
+    return `${day}/${month}/${year}`
+  }
+
+  const parsed = new Date(trimmed)
+  if (!Number.isNaN(parsed.getTime()) && /\d{4}/.test(trimmed)) {
+    return new Intl.DateTimeFormat("pt-BR", {
+      day: "2-digit",
+      month: "2-digit",
+      year: "numeric",
+      timeZone: "UTC",
+    }).format(parsed)
+  }
+
+  return trimmed
 }
 
-function getCrowdLabel(score: number) {
-  if (score <= 30) return "Tranquilo"
-  if (score <= 70) return "Moderado"
-  return "Muito cheio"
+function formatPeriodDisplay(result: TripResult) {
+  if (result.startDate && result.endDate) {
+    return `${formatDateDisplay(result.startDate)} a ${formatDateDisplay(result.endDate)}`
+  }
+
+  if (result.periodLabel?.trim()) {
+    return result.periodLabel.trim()
+  }
+
+  if (result.startDate?.trim()) {
+    return formatDateDisplay(result.startDate)
+  }
+
+  return "Periodo nao informado"
+}
+
+function formatDurationDisplay(result: TripResult, fallbackDays: number) {
+  if (result.durationLabel?.trim()) return result.durationLabel.trim()
+  if (result.durationDays && result.durationDays > 0) return `${result.durationDays} ${result.durationDays === 1 ? "dia" : "dias"}`
+  return `${fallbackDays} ${fallbackDays === 1 ? "dia" : "dias"}`
+}
+
+function getSelectedVariantLabel(variantId: VariantId) {
+  if (variantId === "economico") return "Economico"
+  if (variantId === "premium") return "Premium"
+  return "Intermediario"
+}
+
+function buildOriginSubtitle(source: string, suggestion: string, input: string) {
+  if (source === "quiz") {
+    return "Baseado nas suas respostas do quiz"
+  }
+
+  if (source === "suggestion" && suggestion) {
+    return `Baseado na sugestao escolhida: ${suggestion}`
+  }
+
+  return `Baseado na sua busca: ${input}`
+}
+
+function getConfidenceText(confidence?: "high" | "medium" | "low") {
+  if (confidence === "high") {
+    return "Usamos dados mais especificos para esse destino, deixando a leitura mais precisa."
+  }
+
+  if (confidence === "medium") {
+    return "Combinamos dados do destino com estimativas seguras para manter a recomendacao confiavel."
+  }
+
+  if (confidence === "low") {
+    return "A recomendacao foi completada com heuristicas regionais para nao travar sua experiencia."
+  }
+
+  return ""
+}
+
+function SummaryStat({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="rounded-[22px] border border-border/60 bg-white/80 p-4 shadow-sm backdrop-blur">
+      <div className="text-xs uppercase tracking-[0.14em] text-[#004aad]/65">{label}</div>
+      <div className="mt-2 text-sm font-semibold text-foreground">{value}</div>
+    </div>
+  )
+}
+
+function ExpandableSection({
+  value,
+  title,
+  children,
+}: {
+  value: string
+  title: string
+  children: ReactNode
+}) {
+  return (
+    <AccordionItem value={value} className="rounded-[24px] border border-border/60 bg-white/80 px-4 last:border-b">
+      <AccordionTrigger className="py-4 text-left text-base font-semibold text-foreground hover:no-underline">
+        {title}
+      </AccordionTrigger>
+      <AccordionContent className="pb-4">{children}</AccordionContent>
+    </AccordionItem>
+  )
 }
 
 function IntelligenceMetricCard({
@@ -271,12 +382,87 @@ function IntelligenceMetricCard({
   }
 
   return (
-    <div className="rounded-[24px] border border-border/60 bg-white/80 p-4 shadow-sm backdrop-blur">
+    <div className="rounded-[22px] border border-border/60 bg-white/80 p-4 shadow-sm backdrop-blur">
       <div className="text-sm text-muted-foreground">{title}</div>
-      <div className="mt-2 flex items-end justify-between gap-3">
-        <div className="text-3xl font-semibold text-foreground">{score}</div>
-        <div className="rounded-full bg-secondary/70 px-3 py-1 text-xs font-medium text-foreground">{label ?? "Analisado"}</div>
-      </div>
+      <div className="mt-3 text-lg font-semibold text-foreground">{label ?? "Analisado"}</div>
+      <div className="mt-1 text-xs font-medium uppercase tracking-[0.14em] text-muted-foreground">Score {score}/100</div>
+    </div>
+  )
+}
+
+function CostDetails({
+  value,
+  breakdown,
+  travelersCount,
+}: {
+  value: string
+  breakdown: Array<{ label: string; value: number }>
+  travelersCount: number
+}) {
+  return (
+    <Accordion type="single" collapsible className="mt-3">
+      <AccordionItem value={value} className="rounded-2xl border border-border/60 bg-white/70 px-3 last:border-b">
+        <AccordionTrigger className="py-3 text-sm font-medium text-foreground hover:no-underline">
+          Ver detalhes do custo
+        </AccordionTrigger>
+        <AccordionContent className="pb-3">
+          <div className="space-y-2">
+            {breakdown.map((item) => (
+              <div key={`${value}-${item.label}`} className="flex items-start justify-between gap-3 rounded-2xl bg-secondary/35 px-3 py-3 text-sm">
+                <span className="text-muted-foreground">{item.label}</span>
+                <span className="text-right font-medium text-foreground">
+                  {formatPrice(item.value)}
+                  <span className="block text-xs font-normal text-muted-foreground">
+                    {formatPrice(Math.max(100, Math.round(item.value / travelersCount)))} por pessoa
+                  </span>
+                </span>
+              </div>
+            ))}
+          </div>
+        </AccordionContent>
+      </AccordionItem>
+    </Accordion>
+  )
+}
+
+function VariantSelectorCard({
+  variant,
+  isSelected,
+  travelersCount,
+  onSelect,
+}: {
+  variant: TripVariant
+  isSelected: boolean
+  travelersCount: number
+  onSelect: () => void
+}) {
+  return (
+    <div
+      className={cn(
+        "rounded-[24px] border p-4 transition",
+        isSelected
+          ? "border-[#5de0e6] bg-[linear-gradient(135deg,#5de0e614,#004aad14)] shadow-sm"
+          : "border-border/60 bg-secondary/20",
+      )}
+    >
+      <button type="button" onClick={onSelect} className="block w-full text-left">
+        <div className="flex items-center justify-between gap-3">
+          <div className="text-sm font-semibold text-foreground">{variant.title}</div>
+          {isSelected ? (
+            <span className="rounded-full bg-[#004aad] px-2.5 py-1 text-[11px] font-medium uppercase tracking-[0.12em] text-white">
+              Selecionado
+            </span>
+          ) : null}
+        </div>
+
+        <div className="mt-3 text-2xl font-semibold text-foreground">{formatPrice(variant.total)}</div>
+        <div className="mt-1 text-sm text-muted-foreground">
+          {formatPrice(Math.max(300, Math.round(variant.total / travelersCount)))} por pessoa
+        </div>
+        <p className="mt-4 text-sm leading-6 text-muted-foreground">{variant.insight}</p>
+      </button>
+
+      <CostDetails value={`cost-${variant.id}`} breakdown={variant.breakdown} travelersCount={travelersCount} />
     </div>
   )
 }
@@ -296,7 +482,6 @@ export function ResultView({
 }) {
   const [currentResult, setCurrentResult] = useState(result)
   const [selectedVariant, setSelectedVariant] = useState<VariantId>("intermediario")
-  const [isFullItineraryOpen, setIsFullItineraryOpen] = useState(false)
   const [isCheaperOpen, setIsCheaperOpen] = useState(false)
   const [isAlternativesOpen, setIsAlternativesOpen] = useState(false)
   const [isAdjustOpen, setIsAdjustOpen] = useState(false)
@@ -310,48 +495,46 @@ export function ResultView({
 
   const baseCost = parsePrice(currentResult.estimatedCost)
   const tripVariants = useMemo(() => buildTripVariants(currentResult, baseCost), [currentResult, baseCost])
-  const activeVariant = tripVariants.find((variant) => variant.id === selectedVariant) ?? tripVariants[1]
+  const activeVariant = tripVariants.find((variant) => variant.id === selectedVariant) ?? tripVariants[1] ?? tripVariants[0]
   const activeResult = activeVariant.result
-  const activePeriodItinerary = activeVariant.periodItinerary
-  const activeDetailedItinerary = activeResult.fullItinerary ?? buildDetailedItinerary(activeResult)
+  const activePeriodItinerary = activeVariant.periodItinerary.filter((item) => item.title || item.morning || item.afternoon || item.night)
+  const activeDetailedItinerary = (activeResult.fullItinerary ?? buildDetailedItinerary(activeResult)).filter(Boolean)
   const activeCost = parsePrice(activeResult.estimatedCost)
-  const travelersCount = inferTravelers(activeResult.bestFor)
-  const daysCount = Math.max(activePeriodItinerary.length, activeResult.itinerary.length, 1)
+  const travelersCount = Math.max(1, activeResult.travelers ?? inferTravelers(activeResult.bestFor))
+  const daysCount = Math.max(activeResult.durationDays ?? 0, activePeriodItinerary.length, activeResult.itinerary.length, 1)
   const costPerTraveler = Math.max(300, Math.round(activeCost / travelersCount))
-  const tripPeriodText = activeResult.periodLabel ?? activeResult.durationLabel ?? "Período não informado"
+  const tripPeriodText = formatPeriodDisplay(activeResult)
+  const durationText = formatDurationDisplay(activeResult, daysCount)
   const intelligence = activeResult.intelligence
-  const intelligenceReasons = intelligence?.explanation?.reasons?.filter(Boolean) ?? []
-  const intelligenceWarnings = intelligence?.explanation?.warnings?.filter(Boolean) ?? []
+  const intelligenceReasons = (intelligence?.explanation?.reasons ?? []).filter(Boolean)
+  const intelligenceWarnings = (intelligence?.explanation?.warnings ?? []).filter(Boolean)
+  const summaryText = activeResult.summary?.trim() || "Encontramos uma sugestao pronta para comparar melhor custo, ritmo e conforto."
+  const contextText = activeResult.context?.trim() || "A opcao escolhida equilibra custo, experiencia e praticidade para a viagem."
+  const bestForText = activeResult.bestFor?.trim() || "viagem flexivel"
 
-  const originSubtitle =
-    source === "quiz"
-      ? "Baseado nas suas respostas do quiz"
-      : source === "suggestion" && suggestion
-        ? `Baseado na sugestão escolhida: ${suggestion}`
-        : `Baseado na sua busca: ${input}`
+  const originSubtitle = buildOriginSubtitle(source, suggestion, input)
 
   const cheaperOption = {
     destination: activeResult.cheapestAlternative ?? `${activeResult.destination} Essencial`,
     estimatedCost: formatPrice(Math.max(activeCost - 900, 1800)),
-    reason:
-      "Mantém a proposta principal da viagem, com custo menor, hospedagem mais enxuta e deslocamentos simplificados.",
+    reason: "Mantem a proposta principal da viagem, com custo menor, hospedagem mais enxuta e deslocamentos simplificados.",
   }
 
   const alternatives = [
     {
       destination: activeResult.cheapestAlternative ?? "Porto",
       estimatedCost: formatPrice(Math.max(activeCost - 700, 1900)),
-      reason: "Alternativa com melhor custo-benefício e logística simples.",
+      reason: "Alternativa com melhor custo-beneficio e logistica simples.",
     },
     {
       destination: `${activeResult.destination} Panorama`,
       estimatedCost: formatPrice(Math.max(activeCost + 200, 2200)),
-      reason: "Variação próxima da ideia original, com experiência parecida e ajuste leve de custo.",
+      reason: "Variacao proxima da ideia original, com experiencia parecida e ajuste leve de custo.",
     },
     {
       destination: `${activeResult.destination} Compacto`,
       estimatedCost: formatPrice(Math.max(activeCost - 400, 2000)),
-      reason: "Opção enxuta para manter a viagem viável sem se distanciar da proposta inicial.",
+      reason: "Opcao enxuta para manter a viagem viavel sem se distanciar da proposta inicial.",
     },
   ]
 
@@ -437,259 +620,235 @@ export function ResultView({
 
   return (
     <>
-      <div className="grid gap-6 xl:grid-cols-[1.2fr_0.8fr]">
-        <div className="space-y-6">
-          <BrandCard glow className="p-7 sm:p-8">
-            <InlineBadge className="mb-4">
+      <div className="grid gap-5 xl:grid-cols-[minmax(0,1.2fr)_360px]">
+        <div className="space-y-5">
+          <BrandCard glow className="p-5 sm:p-6">
+            <InlineBadge>
               <Compass className="size-4 text-[#5de0e6]" />
-              Sugestão principal
+              Sugestao principal
             </InlineBadge>
 
-            <div className="flex flex-col gap-6 md:flex-row md:items-end md:justify-between">
-              <div>
+            <div className="mt-4 flex flex-col gap-5 lg:flex-row lg:items-start lg:justify-between">
+              <div className="max-w-2xl">
                 <p className="text-sm uppercase tracking-[0.16em] text-[#004aad]/65">Destino sugerido</p>
-                <h2 className="mt-2 font-heading text-4xl font-bold text-foreground">{activeResult.destination}</h2>
-                <p className="mt-4 max-w-2xl text-muted-foreground">{activeResult.summary}</p>
+                <h2 className="mt-2 font-heading text-3xl font-bold text-foreground sm:text-4xl">{activeResult.destination || "Destino sugerido"}</h2>
+                <p className="mt-3 text-sm leading-6 text-muted-foreground">{summaryText}</p>
+                <p className="mt-2 text-sm text-muted-foreground">{originSubtitle}</p>
               </div>
 
-              <div className="min-w-[220px] rounded-[24px] border border-border/60 bg-secondary/40 p-5">
-                <div className="text-sm text-muted-foreground">Custo total estimado</div>
-                <div className="mt-2 text-3xl font-semibold text-foreground">{activeResult.estimatedCost}</div>
-                <div className="mt-3 text-sm text-muted-foreground">Custo estimado por pessoa: {formatPrice(costPerTraveler)}</div>
-                <div className="mt-2 text-sm text-muted-foreground">
-                  Baseado em {formatTravelerLabel(travelersCount)} por {daysCount} {daysCount === 1 ? "dia" : "dias"}
-                </div>
-                <div className="mt-2 text-sm text-muted-foreground">Período: {tripPeriodText}</div>
-                <div className="mt-2 text-sm text-muted-foreground">Ideal para {activeResult.bestFor}</div>
+              <div className="grid w-full gap-3 sm:grid-cols-2 lg:max-w-[360px]">
+                <SummaryStat label="Custo estimado principal" value={activeResult.estimatedCost || "R$ 0"} />
+                <SummaryStat label="Versao selecionada" value={getSelectedVariantLabel(selectedVariant)} />
               </div>
             </div>
 
-            <div className="mt-6 grid gap-4 xl:grid-cols-3">
-              {tripVariants.map((variant) => {
-                const isSelected = variant.id === activeVariant.id
-
-                return (
-                  <button
-                    key={variant.id}
-                    type="button"
-                    onClick={() => setSelectedVariant(variant.id)}
-                    className={cn(
-                      "rounded-[24px] border p-4 text-left transition",
-                      isSelected
-                        ? "border-[#5de0e6] bg-[linear-gradient(135deg,#5de0e614,#004aad14)] shadow-sm"
-                        : "border-border/60 bg-secondary/20 hover:border-[#5de0e6]/60",
-                    )}
-                  >
-                    <div className="flex items-start justify-between gap-4">
-                      <div>
-                        <div className="text-sm font-medium text-foreground">{variant.title}</div>
-                        <div className="mt-2 text-xs uppercase tracking-[0.14em] text-muted-foreground">Custo total estimado</div>
-                        <div className="mt-1 text-2xl font-semibold text-foreground">{formatPrice(variant.total)}</div>
-                        <div className="mt-2 text-sm text-muted-foreground">
-                          Por pessoa: {formatPrice(Math.max(300, Math.round(variant.total / travelersCount)))}
-                        </div>
-                        <div className="mt-1 text-xs text-muted-foreground">
-                          Baseado em {formatTravelerLabel(travelersCount)} por {daysCount} {daysCount === 1 ? "dia" : "dias"}
-                        </div>
-                      </div>
-                    </div>
-
-                    <div className="mt-4 space-y-2 rounded-2xl bg-white/70 px-4 py-3">
-                      {variant.breakdown.map((item) => (
-                        <div key={`${variant.id}-${item.label}`} className="flex items-center justify-between gap-3 text-sm">
-                          <span className="text-muted-foreground">{item.label}</span>
-                          <span className="text-right font-medium text-foreground">
-                            {formatPrice(item.value)}
-                            <span className="block text-xs font-normal text-muted-foreground">
-                              {formatPrice(Math.max(100, Math.round(item.value / travelersCount)))} por pessoa
-                            </span>
-                          </span>
-                        </div>
-                      ))}
-                    </div>
-                  </button>
-                )
-              })}
+            <div className="mt-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+              <SummaryStat label="Periodo" value={tripPeriodText} />
+              <SummaryStat label="Duracao" value={durationText} />
+              <SummaryStat label="Pessoas" value={formatTravelerLabel(travelersCount)} />
+              <SummaryStat label="Por pessoa" value={formatPrice(costPerTraveler)} />
             </div>
           </BrandCard>
 
-          <div className="grid gap-6 lg:grid-cols-2">
-            <BrandCard className="p-6">
-              <div className="mb-4 flex items-center gap-2 text-foreground">
-                <Map className="size-5 text-[#004aad]" />
-                <h3 className="text-lg font-semibold">Roteiro resumido</h3>
+          <BrandCard className="p-5 sm:p-6">
+            <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
+              <div>
+                <h3 className="text-xl font-semibold text-foreground">Compare as opcoes da viagem</h3>
+                <p className="mt-1 text-sm leading-6 text-muted-foreground">
+                  Economico, intermediario e premium organizados para comparar total, valor por pessoa e proposta da experiencia.
+                </p>
               </div>
-
-              <ul className="space-y-3 text-sm leading-6 text-muted-foreground">
-                {activeResult.itinerary.map((day) => (
-                  <li key={day} className="rounded-2xl bg-secondary/35 px-4 py-3">
-                    {day}
-                  </li>
-                ))}
-              </ul>
-
-              <button
-                type="button"
-                onClick={() => setIsFullItineraryOpen(true)}
-                className="mt-5 inline-flex w-full items-center justify-center gap-2 rounded-2xl border border-border/60 bg-white/80 px-4 py-3 text-sm font-medium text-foreground transition hover:border-[#5de0e6]/60"
-              >
-                <Map className="size-4 text-[#004aad]" />
-                Ver roteiro completo
-              </button>
-
-              <button
-                type="button"
-                onClick={() => void handleDownload()}
-                className="mt-3 inline-flex w-full items-center justify-center gap-2 rounded-2xl border border-border/60 bg-white/80 px-4 py-3 text-sm font-medium text-foreground transition hover:border-[#5de0e6]/60"
-              >
-                <Download className="size-4 text-[#004aad]" />
-                Baixar roteiro
-              </button>
-            </BrandCard>
-
-            <BrandCard className="p-6">
-              <div className="mb-4 flex items-center gap-2 text-foreground">
-                <Wallet className="size-5 text-[#004aad]" />
-                <h3 className="text-lg font-semibold">Insight da opção escolhida</h3>
+              <div className="text-sm text-muted-foreground">
+                {selectedVariant === "economico"
+                  ? "Menor custo entre as opcoes"
+                  : selectedVariant === "premium"
+                    ? "Maior conforto e investimento"
+                    : "Melhor equilibrio entre conforto e custo"}
               </div>
+            </div>
 
-              <p className="rounded-2xl bg-secondary/35 px-4 py-4 text-sm leading-6 text-muted-foreground">
-                {activeResult.context}
-              </p>
+            <div className="mt-4 grid gap-3 xl:grid-cols-3">
+              {tripVariants.map((variant) => (
+                <VariantSelectorCard
+                  key={variant.id}
+                  variant={variant}
+                  isSelected={variant.id === selectedVariant}
+                  travelersCount={travelersCount}
+                  onSelect={() => setSelectedVariant(variant.id)}
+                />
+              ))}
+            </div>
+          </BrandCard>
 
-              <div className="mt-5 space-y-3">
-                {activeResult.tips.map((tip) => (
-                  <div key={tip} className="rounded-2xl border border-border/50 px-4 py-3 text-sm text-muted-foreground">
+          <Accordion type="multiple" className="space-y-4">
+            <ExpandableSection value="summary-itinerary" title="Ver roteiro resumido">
+              <div className="space-y-3 text-sm leading-6 text-muted-foreground">
+                {(activeResult.itinerary.filter(Boolean).length > 0 ? activeResult.itinerary.filter(Boolean) : ["Roteiro resumido indisponivel no momento."]).map(
+                  (day) => (
+                    <div key={day} className="rounded-2xl bg-secondary/35 px-4 py-3">
+                      {day}
+                    </div>
+                  ),
+                )}
+              </div>
+            </ExpandableSection>
+
+            <ExpandableSection value="full-itinerary" title="Ver roteiro completo">
+              <div className="space-y-3 text-sm leading-6 text-muted-foreground">
+                {activePeriodItinerary.length > 0
+                  ? activePeriodItinerary.map((day) => (
+                      <div key={`${day.title}-expanded`} className="rounded-[22px] border border-border/60 bg-secondary/15 p-4">
+                        <div className="font-medium text-foreground">{day.title}</div>
+                        <div className="mt-3 grid gap-2">
+                          <div>
+                            <span className="font-medium text-foreground">Manha:</span> {day.morning}
+                          </div>
+                          <div>
+                            <span className="font-medium text-foreground">Tarde:</span> {day.afternoon}
+                          </div>
+                          <div>
+                            <span className="font-medium text-foreground">Noite:</span> {day.night}
+                          </div>
+                        </div>
+                      </div>
+                    ))
+                  : activeDetailedItinerary.map((day) => (
+                      <div key={day} className="rounded-2xl bg-secondary/35 px-4 py-3">
+                        {day}
+                      </div>
+                    ))}
+              </div>
+            </ExpandableSection>
+
+            <ExpandableSection value="selected-insights" title="Ver insights da opcao escolhida">
+              <div className="space-y-3">
+                <div className="rounded-[22px] border border-border/60 bg-secondary/20 p-4 text-sm leading-6 text-muted-foreground">
+                  {contextText}
+                </div>
+                {(activeResult.tips.filter(Boolean).length > 0 ? activeResult.tips.filter(Boolean) : ["Sem observacoes adicionais nesta opcao."]).map((tip) => (
+                  <div key={tip} className="rounded-2xl border border-border/60 bg-white/80 px-4 py-3 text-sm leading-6 text-muted-foreground">
                     {tip}
                   </div>
                 ))}
               </div>
-            </BrandCard>
-          </div>
+            </ExpandableSection>
 
-          {intelligence ? (
-            <BrandCard className="p-6 sm:p-7">
-              <div className="flex items-start gap-3">
-                <div className="rounded-2xl bg-[linear-gradient(135deg,#5de0e620,#004aad12)] p-3">
-                  <Sparkles className="size-5 text-[#004aad]" />
-                </div>
-                <div>
-                  <h3 className="text-xl font-semibold text-foreground">Por que essa viagem faz sentido para você</h3>
-                  <p className="mt-2 max-w-3xl text-sm leading-6 text-muted-foreground">
-                    Analisamos custo, clima, período, lotação e perfil da viagem para montar essa recomendação.
-                  </p>
-                </div>
-              </div>
-
-              <div className="mt-6 grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
-                <IntelligenceMetricCard
-                  title="Score de compatibilidade"
-                  score={intelligence.destinationMatchScore}
-                  label={getCompatibilityLabel(intelligence.destinationMatchScore)}
-                />
-                <IntelligenceMetricCard
-                  title="Acessibilidade de custo"
-                  score={intelligence.affordabilityScore}
-                  label={getAffordabilityLabel(intelligence.affordabilityScore)}
-                />
-                <IntelligenceMetricCard
-                  title="Melhor momento de compra"
-                  score={intelligence.smartTimingScore?.score}
-                  label={intelligence.smartTimingScore?.label}
-                />
-                <IntelligenceMetricCard
-                  title="Conforto climático"
-                  score={intelligence.climateComfortScore}
-                  label="Condições estimadas"
-                />
-                <IntelligenceMetricCard
-                  title="Lotação turística"
-                  score={intelligence.overcrowdingIndex?.score}
-                  label={intelligence.overcrowdingIndex?.label ?? getCrowdLabel(intelligence.overcrowdingIndex?.score ?? 0)}
-                />
-                <IntelligenceMetricCard
-                  title="Conforto da rota"
-                  score={intelligence.routeComfortScore}
-                  label="Deslocamento e mobilidade"
-                />
-              </div>
-
-              <div className="mt-6 grid gap-4 lg:grid-cols-[1.2fr_0.8fr]">
-                {intelligence.explanation?.summary ? (
-                  <div className="rounded-[24px] border border-border/60 bg-secondary/25 p-5">
-                    <div className="text-sm font-medium text-foreground">Inteligência da viagem</div>
-                    <p className="mt-3 text-sm leading-6 text-muted-foreground">{intelligence.explanation.summary}</p>
-                  </div>
-                ) : null}
-
-                {intelligence.dataConfidence ? (
-                  <div className="rounded-[24px] border border-border/60 bg-white/80 p-5">
-                    <div className="text-sm font-medium text-foreground">Segurança da análise</div>
-                    <p className="mt-3 text-sm leading-6 text-muted-foreground">
-                      {intelligence.dataConfidence === "high"
-                        ? "Usamos dados mais específicos para esse destino, deixando a leitura mais precisa."
-                        : intelligence.dataConfidence === "medium"
-                          ? "Combinamos dados do destino com estimativas seguras para manter a recomendação confiável."
-                          : "A recomendação foi completada com heurísticas regionais para não travar sua experiência."}
+            {intelligence ? (
+              <ExpandableSection value="why-this-trip" title="Por que essa viagem faz sentido para voce">
+                <div className="space-y-4">
+                  <div className="rounded-[22px] border border-border/60 bg-secondary/20 p-4">
+                    <div className="text-sm font-medium text-foreground">Leitura resumida</div>
+                    <p className="mt-2 text-sm leading-6 text-muted-foreground">
+                      {intelligence.explanation?.summary?.trim() ||
+                        "Analisamos custo, clima, periodo, lotacao e perfil da viagem para montar esta recomendacao."}
                     </p>
+                    {intelligence.explanation?.strongestPoint ? (
+                      <p className="mt-3 text-sm leading-6 text-muted-foreground">{intelligence.explanation.strongestPoint}</p>
+                    ) : null}
                   </div>
-                ) : null}
-              </div>
 
-              {intelligenceReasons.length > 0 || intelligenceWarnings.length > 0 ? (
-                <div className="mt-6 grid gap-4 lg:grid-cols-2">
+                  <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+                    <IntelligenceMetricCard
+                      title="Compatibilidade"
+                      score={intelligence.destinationMatchScore}
+                      label={getScoreLabel("compatibility", intelligence.destinationMatchScore)}
+                    />
+                    <IntelligenceMetricCard
+                      title="Custo"
+                      score={intelligence.affordabilityScore}
+                      label={getScoreLabel("cost", intelligence.affordabilityScore)}
+                    />
+                    <IntelligenceMetricCard
+                      title="Melhor momento"
+                      score={intelligence.smartTimingScore?.score}
+                      label={intelligence.smartTimingScore?.label?.trim() || "Analisado"}
+                    />
+                    <IntelligenceMetricCard
+                      title="Clima"
+                      score={intelligence.climateComfortScore}
+                      label={getScoreLabel("climate", intelligence.climateComfortScore)}
+                    />
+                    <IntelligenceMetricCard
+                      title="Lotacao"
+                      score={intelligence.overcrowdingIndex?.score}
+                      label={getScoreLabel("crowd", intelligence.overcrowdingIndex?.score ?? 0)}
+                    />
+                    <IntelligenceMetricCard
+                      title="Rota"
+                      score={intelligence.routeComfortScore}
+                      label={getScoreLabel("route", intelligence.routeComfortScore)}
+                    />
+                  </div>
+
                   {intelligenceReasons.length > 0 ? (
-                    <div className="rounded-[24px] border border-border/60 bg-white/80 p-5">
-                      <div className="text-sm font-medium text-foreground">O que reforça essa escolha</div>
-                      <div className="mt-4 space-y-3">
-                        {intelligenceReasons.map((reason) => (
-                          <div key={reason} className="rounded-2xl bg-secondary/45 px-4 py-3 text-sm leading-6 text-muted-foreground">
-                            {reason}
-                          </div>
-                        ))}
-                      </div>
+                    <div className="space-y-3">
+                      {intelligenceReasons.map((reason) => (
+                        <div key={reason} className="rounded-2xl border border-border/60 bg-white/80 px-4 py-3 text-sm leading-6 text-muted-foreground">
+                          {reason}
+                        </div>
+                      ))}
                     </div>
                   ) : null}
 
-                  {intelligenceWarnings.length > 0 ? (
-                    <div className="rounded-[24px] border border-border/60 bg-white/80 p-5">
-                      <div className="text-sm font-medium text-foreground">Pontos de atenção para decidir melhor</div>
-                      <div className="mt-4 space-y-3">
-                        {intelligenceWarnings.map((warning) => (
-                          <div
-                            key={warning}
-                            className="rounded-2xl bg-[linear-gradient(135deg,#fff7ed,#f8fafc)] px-4 py-3 text-sm leading-6 text-muted-foreground"
-                          >
-                            {warning}
-                          </div>
-                        ))}
-                      </div>
+                  {intelligence.dataConfidence ? (
+                    <div className="rounded-[22px] border border-border/60 bg-white/80 p-4 text-sm leading-6 text-muted-foreground">
+                      {getConfidenceText(intelligence.dataConfidence)}
                     </div>
                   ) : null}
                 </div>
-              ) : null}
-            </BrandCard>
-          ) : null}
+              </ExpandableSection>
+            ) : null}
+
+            <ExpandableSection value="attention-points" title="Pontos de atencao">
+              <div className="space-y-3">
+                {intelligence?.explanation?.attentionPoint ? (
+                  <div className="rounded-[22px] border border-border/60 bg-[linear-gradient(135deg,#fff7ed,#f8fafc)] p-4 text-sm leading-6 text-muted-foreground">
+                    {intelligence.explanation.attentionPoint}
+                  </div>
+                ) : null}
+
+                {(intelligenceWarnings.length > 0
+                  ? intelligenceWarnings
+                  : ["Nao ha pontos criticos adicionais para esta sugestao no momento."]).map((warning) => (
+                  <div
+                    key={warning}
+                    className="rounded-[22px] border border-border/60 bg-[linear-gradient(135deg,#fff7ed,#f8fafc)] px-4 py-3 text-sm leading-6 text-muted-foreground"
+                  >
+                    {warning}
+                  </div>
+                ))}
+              </div>
+            </ExpandableSection>
+          </Accordion>
         </div>
 
-        <div className="space-y-6">
-          <BrandCard className="p-6">
-            <h3 className="text-lg font-semibold text-foreground">Ações de exploração</h3>
+        <div className="space-y-5">
+          <BrandCard className="p-5 sm:p-6">
+            <h3 className="text-lg font-semibold text-foreground">Acoes de exploracao</h3>
 
-            <div className="mt-5 space-y-3">
+            <div className="mt-4 grid gap-3">
+              <button
+                type="button"
+                onClick={() => void handleDownload()}
+                className="inline-flex w-full items-center justify-between rounded-2xl border border-border/60 bg-white/80 px-4 py-4 text-sm font-medium text-foreground transition hover:border-[#5de0e6]/60"
+              >
+                Baixar roteiro
+                <Download className="size-4 text-[#004aad]" />
+              </button>
+
               <button
                 type="button"
                 onClick={() => setIsCheaperOpen(true)}
-                className="flex w-full items-center justify-between rounded-2xl border border-border/60 px-4 py-4 text-sm transition hover:border-[#5de0e6]/60"
+                className="inline-flex w-full items-center justify-between rounded-2xl border border-border/60 bg-white/80 px-4 py-4 text-sm font-medium text-foreground transition hover:border-[#5de0e6]/60"
               >
-                Ver opção mais barata
+                Ver opcao mais barata
                 <ArrowLeftRight className="size-4 text-[#004aad]" />
               </button>
 
               <button
                 type="button"
                 onClick={() => setIsAlternativesOpen(true)}
-                className="flex w-full items-center justify-between rounded-2xl border border-border/60 px-4 py-4 text-sm transition hover:border-[#5de0e6]/60"
+                className="inline-flex w-full items-center justify-between rounded-2xl border border-border/60 bg-white/80 px-4 py-4 text-sm font-medium text-foreground transition hover:border-[#5de0e6]/60"
               >
                 Tentar outro destino
                 <ArrowLeftRight className="size-4 text-[#004aad]" />
@@ -698,7 +857,7 @@ export function ResultView({
               <button
                 type="button"
                 onClick={() => setIsAdjustOpen(true)}
-                className="flex w-full items-center justify-between rounded-2xl border border-border/60 px-4 py-4 text-sm transition hover:border-[#5de0e6]/60"
+                className="inline-flex w-full items-center justify-between rounded-2xl border border-border/60 bg-white/80 px-4 py-4 text-sm font-medium text-foreground transition hover:border-[#5de0e6]/60"
               >
                 Ajustar viagem
                 <ArrowLeftRight className="size-4 text-[#004aad]" />
@@ -706,12 +865,23 @@ export function ResultView({
             </div>
           </BrandCard>
 
+          <BrandCard className="p-5 sm:p-6">
+            <div className="mb-3 flex items-center gap-2 text-foreground">
+              <Sparkles className="size-5 text-[#004aad]" />
+              <h3 className="text-lg font-semibold">Resumo comercial</h3>
+            </div>
+            <div className="space-y-3">
+              <SummaryStat label="Destino" value={activeResult.destination || "Destino sugerido"} />
+              <SummaryStat label="Periodo" value={tripPeriodText} />
+              <SummaryStat label="Ideal para" value={bestForText} />
+            </div>
+          </BrandCard>
+
           {loggedIn ? (
-            <BrandCard glow className="p-6">
+            <BrandCard glow className="p-5 sm:p-6">
               <h3 className="text-lg font-semibold text-foreground">Resultado com continuidade</h3>
               <p className="mt-3 text-sm leading-6 text-muted-foreground">
-                Como usuário logado, você pode salvar esta busca, voltar ao dashboard e continuar ajustando destinos com
-                o seu histórico.
+                Como usuario logado, voce pode salvar esta busca, voltar ao dashboard e continuar ajustando destinos com o seu historico.
               </p>
 
               <div className="mt-5 grid gap-3">
@@ -727,15 +897,14 @@ export function ResultView({
               </div>
             </BrandCard>
           ) : (
-            <BrandCard glow className="p-6">
+            <BrandCard glow className="p-5 sm:p-6">
               <div className="mb-4 flex items-center gap-2">
                 <CreditCard className="size-5 text-[#004aad]" />
-                <h3 className="text-lg font-semibold text-foreground">Continue depois da busca grátis</h3>
+                <h3 className="text-lg font-semibold text-foreground">Continue depois da busca gratis</h3>
               </div>
 
               <p className="text-sm leading-6 text-muted-foreground">
-                Você já viu o valor e a direção da viagem. Faça login para salvar histórico, continuar ajustes e encontrar
-                sua viagem ideal de forma rápida com VUEI.
+                Voce ja viu o valor e a direcao da viagem. Faca login para salvar historico, continuar ajustes e encontrar sua viagem ideal de forma rapida com VUEI.
               </p>
 
               <div className="mt-5 grid gap-3">
@@ -754,65 +923,13 @@ export function ResultView({
         </div>
       </div>
 
-      <Dialog open={isFullItineraryOpen} onOpenChange={setIsFullItineraryOpen}>
-        <DialogContent className="flex max-h-[90vh] max-w-2xl flex-col overflow-hidden rounded-[28px] border-border/60 bg-background p-0 shadow-2xl">
-          <div className="flex min-h-0 flex-1 flex-col p-6 sm:p-7">
-            <DialogHeader>
-              <DialogTitle className="font-heading text-2xl text-foreground">Roteiro completo</DialogTitle>
-              <DialogDescription className="text-muted-foreground">
-                Veja o detalhamento da sugestão montada pelo VUEI para {activeResult.destination}.
-              </DialogDescription>
-            </DialogHeader>
-
-            <div className="mt-6 flex-1 overflow-y-auto pr-1">
-              <div className="space-y-4 text-sm leading-6 text-muted-foreground">
-                {activePeriodItinerary.map((day) => (
-                  <div key={`${day.title}-modal`} className="rounded-[24px] border border-border/60 bg-white/80 p-4">
-                    <div className="font-medium text-foreground">{day.title}</div>
-                    <div className="mt-3 grid gap-3">
-                      <div>
-                        <span className="font-medium text-foreground">Manhã:</span> {day.morning}
-                      </div>
-                      <div>
-                        <span className="font-medium text-foreground">Tarde:</span> {day.afternoon}
-                      </div>
-                      <div>
-                        <span className="font-medium text-foreground">Noite:</span> {day.night}
-                      </div>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-
-            <DialogFooter className="mt-6 shrink-0 gap-3 sm:justify-between">
-              <button
-                type="button"
-                onClick={() => setIsFullItineraryOpen(false)}
-                className="inline-flex items-center justify-center rounded-2xl border border-border/60 bg-white/80 px-4 py-3 text-sm font-medium text-foreground transition hover:border-[#5de0e6]/60"
-              >
-                Fechar
-              </button>
-              <button
-                type="button"
-                onClick={handleDownload}
-                className="inline-flex items-center justify-center gap-2 rounded-2xl border border-border/60 bg-white/80 px-4 py-3 text-sm font-medium text-foreground transition hover:border-[#5de0e6]/60"
-              >
-                <Download className="size-4 text-[#004aad]" />
-                Baixar roteiro
-              </button>
-            </DialogFooter>
-          </div>
-        </DialogContent>
-      </Dialog>
-
       <Dialog open={isCheaperOpen} onOpenChange={setIsCheaperOpen}>
         <DialogContent className="max-w-xl rounded-[28px] border-border/60 bg-background p-0 shadow-2xl">
           <div className="p-6 sm:p-7">
             <DialogHeader>
-              <DialogTitle className="font-heading text-2xl text-foreground">Opção mais barata</DialogTitle>
+              <DialogTitle className="font-heading text-2xl text-foreground">Opcao mais barata</DialogTitle>
               <DialogDescription className="text-muted-foreground">
-                Uma alternativa mais econômica para manter a viagem dentro de um custo menor.
+                Uma alternativa mais economica para manter a viagem dentro de um custo menor.
               </DialogDescription>
             </DialogHeader>
 
@@ -832,24 +949,24 @@ export function ResultView({
                     ...activeResult,
                     destination: cheaperOption.destination,
                     estimatedCost: cheaperOption.estimatedCost,
-                    summary: "Uma alternativa mais econômica para manter a viagem viável, com menos atrito e gasto menor.",
+                    summary: "Uma alternativa mais economica para manter a viagem viavel, com menos atrito e gasto menor.",
                     context: cheaperOption.reason,
                     itinerary: [
-                      "Dia 1: chegada e instalação em área prática",
+                      "Dia 1: chegada e instalacao em area pratica",
                       "Dia 2: passeio principal com roteiro enxuto",
-                      "Dia 3: experiência local com melhor custo-benefício",
+                      "Dia 3: experiencia local com melhor custo-beneficio",
                       "Dia 4: retorno com agenda leve",
                     ],
                     fullItinerary: [
-                      `Dia 1. Manhã: chegada em ${cheaperOption.destination} e check-in. Tarde: deslocamentos curtos e organização prática. Noite: jantar simples em área bem localizada.`,
-                      "Dia 2. Manhã: passeio principal com início cedo. Tarde: continuidade do roteiro central com pausa leve. Noite: descanso e jantar acessível.",
-                      "Dia 3. Manhã: experiência local complementar. Tarde: agenda com melhor custo-benefício. Noite: retorno tranquilo e planejamento final.",
-                      "Dia 4. Manhã: últimas visitas rápidas. Tarde: check-out e retorno. Noite: deslocamento final com menos etapas.",
+                      `Dia 1. Manha: chegada em ${cheaperOption.destination} e check-in. Tarde: deslocamentos curtos e organizacao pratica. Noite: jantar simples em area bem localizada.`,
+                      "Dia 2. Manha: passeio principal com inicio cedo. Tarde: continuidade do roteiro central com pausa leve. Noite: descanso e jantar acessivel.",
+                      "Dia 3. Manha: experiencia local complementar. Tarde: agenda com melhor custo-beneficio. Noite: retorno tranquilo e planejamento final.",
+                      "Dia 4. Manha: ultimas visitas rapidas. Tarde: check-out e retorno. Noite: deslocamento final com menos etapas.",
                     ],
                     tips: [
-                      "Hospedagens menores ajudam a controlar o orçamento.",
+                      "Hospedagens menores ajudam a controlar o orcamento.",
                       "Deslocamentos curtos reduzem o custo total.",
-                      "Reservas com antecedência melhoram o preço final.",
+                      "Reservas com antecedencia melhoram o preco final.",
                     ],
                     cheapestAlternative: activeResult.destination,
                     bestFor: `economia, ${activeResult.bestFor}`,
@@ -859,7 +976,7 @@ export function ResultView({
                 }}
                 className="inline-flex items-center justify-center rounded-2xl border border-border/60 bg-white/80 px-4 py-3 text-sm font-medium text-foreground transition hover:border-[#5de0e6]/60"
               >
-                Aplicar esta opção
+                Aplicar esta opcao
               </button>
             </DialogFooter>
           </div>
@@ -886,19 +1003,19 @@ export function ResultView({
                       ...activeResult,
                       destination: alternative.destination,
                       estimatedCost: alternative.estimatedCost,
-                      summary: "Uma nova sugestão para variar a rota sem se afastar muito da ideia inicial da busca.",
+                      summary: "Uma nova sugestao para variar a rota sem se afastar muito da ideia inicial da busca.",
                       context: alternative.reason,
                       itinerary: [
-                        `Dia 1: chegada em ${alternative.destination} e reconhecimento da área`,
+                        `Dia 1: chegada em ${alternative.destination} e reconhecimento da area`,
                         "Dia 2: passeio principal com ritmo leve",
                         "Dia 3: atividade complementar ou bate-volta",
                         "Dia 4: gastronomia local e retorno",
                       ],
                       fullItinerary: [
-                        `Dia 1. Manhã: chegada em ${alternative.destination} e check-in. Tarde: reconhecimento dos pontos principais. Noite: jantar leve e descanso.`,
-                        "Dia 2. Manhã: passeio principal da viagem. Tarde: continuidade da experiência com pausas confortáveis. Noite: tempo livre para gastronomia.",
-                        "Dia 3. Manhã: atividade complementar. Tarde: bate-volta ou experiência local. Noite: encerramento leve do dia.",
-                        "Dia 4. Manhã: últimas visitas. Tarde: check-out e retorno. Noite: deslocamento final.",
+                        `Dia 1. Manha: chegada em ${alternative.destination} e check-in. Tarde: reconhecimento dos pontos principais. Noite: jantar leve e descanso.`,
+                        "Dia 2. Manha: passeio principal da viagem. Tarde: continuidade da experiencia com pausas confortaveis. Noite: tempo livre para gastronomia.",
+                        "Dia 3. Manha: atividade complementar. Tarde: bate-volta ou experiencia local. Noite: encerramento leve do dia.",
+                        "Dia 4. Manha: ultimas visitas. Tarde: check-out e retorno. Noite: deslocamento final.",
                       ],
                       tips: [
                         "Cheque datas fora do pico para reduzir custos.",
@@ -928,13 +1045,13 @@ export function ResultView({
             <DialogHeader>
               <DialogTitle className="font-heading text-2xl text-foreground">Ajustar viagem</DialogTitle>
               <DialogDescription className="text-muted-foreground">
-                Faça um ajuste rápido e veja a sugestão ser atualizada localmente.
+                Faca um ajuste rapido e veja a sugestao ser atualizada localmente.
               </DialogDescription>
             </DialogHeader>
 
             <div className="mt-6 grid gap-4 sm:grid-cols-2">
               <label className="block">
-                <span className="mb-2 block text-sm font-medium text-foreground">Orçamento</span>
+                <span className="mb-2 block text-sm font-medium text-foreground">Orcamento</span>
                 <input
                   value={adjustForm.budget}
                   onChange={(event) => setAdjustForm((value) => ({ ...value, budget: event.target.value }))}
@@ -961,7 +1078,7 @@ export function ResultView({
               </label>
 
               <label className="block">
-                <span className="mb-2 block text-sm font-medium text-foreground">Período/mês</span>
+                <span className="mb-2 block text-sm font-medium text-foreground">Periodo/mes</span>
                 <input
                   value={adjustForm.period}
                   onChange={(event) => setAdjustForm((value) => ({ ...value, period: event.target.value }))}
@@ -980,21 +1097,21 @@ export function ResultView({
                     ...activeResult,
                     estimatedCost: formatPrice(adjustedCost),
                     summary: `Viagem ajustada para ${adjustForm.duration.toLowerCase()}, com estilo ${adjustForm.style.toLowerCase()} e foco em ${adjustForm.period.toLowerCase()}.`,
-                    context: `A sugestão foi recalibrada com orçamento de ${adjustForm.budget}, duração de ${adjustForm.duration}, estilo ${adjustForm.style} e período ${adjustForm.period}.`,
+                    context: `A sugestao foi recalibrada com orcamento de ${adjustForm.budget}, duracao de ${adjustForm.duration}, estilo ${adjustForm.style} e periodo ${adjustForm.period}.`,
                     itinerary: [
-                      `Dia 1: chegada e início da viagem com foco ${adjustForm.style.toLowerCase()}`,
+                      `Dia 1: chegada e inicio da viagem com foco ${adjustForm.style.toLowerCase()}`,
                       `Dia 2: roteiro principal ajustado para ${adjustForm.duration.toLowerCase()}`,
-                      `Dia 3: experiência complementar pensada para ${adjustForm.period.toLowerCase()}`,
+                      `Dia 3: experiencia complementar pensada para ${adjustForm.period.toLowerCase()}`,
                       "Dia 4: fechamento da viagem com retorno otimizado",
                     ],
                     fullItinerary: [
-                      `Dia 1. Manhã: chegada e check-in dentro do orçamento de ${adjustForm.budget}. Tarde: organização da agenda principal. Noite: jantar leve e descanso.`,
-                      `Dia 2. Manhã: início do roteiro principal. Tarde: experiências alinhadas à duração de ${adjustForm.duration.toLowerCase()}. Noite: pausa confortável e gastronomia.`,
-                      `Dia 3. Manhã: atividades alinhadas ao estilo ${adjustForm.style.toLowerCase()}. Tarde: experiência complementar no período de ${adjustForm.period.toLowerCase()}. Noite: fechamento leve do dia.`,
-                      "Dia 4. Manhã: últimos passeios. Tarde: check-out e retorno. Noite: encerramento da viagem.",
+                      `Dia 1. Manha: chegada e check-in dentro do orcamento de ${adjustForm.budget}. Tarde: organizacao da agenda principal. Noite: jantar leve e descanso.`,
+                      `Dia 2. Manha: inicio do roteiro principal. Tarde: experiencias alinhadas a duracao de ${adjustForm.duration.toLowerCase()}. Noite: pausa confortavel e gastronomia.`,
+                      `Dia 3. Manha: atividades alinhadas ao estilo ${adjustForm.style.toLowerCase()}. Tarde: experiencia complementar no periodo de ${adjustForm.period.toLowerCase()}. Noite: fechamento leve do dia.`,
+                      "Dia 4. Manha: ultimos passeios. Tarde: check-out e retorno. Noite: encerramento da viagem.",
                     ],
                     tips: [
-                      `Viajar em ${adjustForm.period.toLowerCase()} pode mudar disponibilidade e preço.`,
+                      `Viajar em ${adjustForm.period.toLowerCase()} pode mudar disponibilidade e preco.`,
                       `O estilo ${adjustForm.style.toLowerCase()} pede uma agenda coerente com o ritmo desejado.`,
                       "Vale revisar hospedagem e deslocamento para manter o custo sob controle.",
                     ],
@@ -1026,8 +1143,8 @@ export function ResultView({
             destination={activeResult.destination}
             estimatedCost={activeResult.estimatedCost}
             originSubtitle={originSubtitle}
-            periodLabel={activeResult.periodLabel}
-            durationLabel={activeResult.durationLabel}
+            periodLabel={activeResult.periodLabel ?? tripPeriodText}
+            durationLabel={activeResult.durationLabel ?? durationText}
             summary={activeResult.summary}
             itinerary={activeResult.itinerary}
             detailedItinerary={activeDetailedItinerary}
