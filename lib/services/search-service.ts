@@ -17,12 +17,16 @@ function mapSearchRowToSearch(row: SearchRow): Search {
   const summary = typeof rawResult.summary === "string" ? rawResult.summary : row.prompt
   const bestFor = typeof rawResult.bestFor === "string" ? rawResult.bestFor : "indefinido"
   const context = typeof rawResult.context === "string" ? rawResult.context : `Busca via ${row.source}`
+  const periodLabel = typeof rawResult.periodLabel === "string" ? rawResult.periodLabel : undefined
+  const durationLabel = typeof rawResult.durationLabel === "string" ? rawResult.durationLabel : undefined
 
   const result: TripResult = {
     destination,
     estimatedCost,
     bestFor,
     summary,
+    periodLabel,
+    durationLabel,
     itinerary: shortItinerary,
     fullItinerary,
     tips,

@@ -3,7 +3,7 @@
 import { useState } from "react"
 import Image from "next/image"
 import Link from "next/link"
-import { CreditCard, HelpCircle, History, Home, LogOut, Shield, User } from "lucide-react"
+import { CreditCard, HelpCircle, History, Home, LogOut, Menu, Shield, User, X } from "lucide-react"
 import { signOut } from "@/lib/services/session-service"
 import { creditPackages } from "@/lib/constants/credit-packages"
 import { formatShortDate } from "@/lib/utils/format"
@@ -20,6 +20,7 @@ export function DashboardHeader({ user, searches = [] }: { user: DashboardUser; 
   const [isHelpOpen, setIsHelpOpen] = useState(false)
   const [isEditProfileOpen, setIsEditProfileOpen] = useState(false)
   const [isChangePasswordOpen, setIsChangePasswordOpen] = useState(false)
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false)
   const [selectedPackId, setSelectedPackId] = useState("")
   const [checkoutLoadingPackId, setCheckoutLoadingPackId] = useState("")
   const [creditsError, setCreditsError] = useState("")
@@ -49,6 +50,10 @@ export function DashboardHeader({ user, searches = [] }: { user: DashboardUser; 
       newPassword: "",
       confirmPassword: "",
     })
+  }
+
+  function closeMobileMenu() {
+    setIsMobileMenuOpen(false)
   }
 
   async function handleCheckout(packId: string) {
@@ -129,41 +134,103 @@ export function DashboardHeader({ user, searches = [] }: { user: DashboardUser; 
             </Link>
           </nav>
 
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={() => setIsMobileMenuOpen((current) => !current)}
+              className="inline-flex items-center justify-center rounded-full border border-border/60 bg-white/80 p-2 text-foreground transition hover:border-[#5de0e6]/60 md:hidden"
+              aria-label={isMobileMenuOpen ? "Fechar menu" : "Abrir menu"}
+            >
+              {isMobileMenuOpen ? <X className="size-5" /> : <Menu className="size-5" />}
+            </button>
+
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <button
+                  type="button"
+                  className="inline-flex items-center justify-center rounded-full border border-border/60 bg-white/80 p-1 text-foreground transition hover:border-[#5de0e6]/60"
+                >
+                  <Avatar className="size-10">
+                    <AvatarFallback className="bg-[linear-gradient(135deg,#5de0e6,#004aad)] text-sm font-semibold text-white">
+                      {user.name.slice(0, 1).toUpperCase()}
+                    </AvatarFallback>
+                  </Avatar>
+                </button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="w-64 rounded-2xl border-border/60 p-2">
+                <DropdownMenuLabel className="px-3 py-2">
+                  <div className="text-sm font-semibold text-foreground">{profileForm.name}</div>
+                  <div className="mt-1 text-xs font-normal text-muted-foreground">{profileForm.email}</div>
+                </DropdownMenuLabel>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem className="rounded-xl px-3 py-2" onSelect={() => setIsEditProfileOpen(true)}>
+                  <User className="size-4 text-[#004aad]" />
+                  Editar perfil
+                </DropdownMenuItem>
+                <DropdownMenuItem className="rounded-xl px-3 py-2" onSelect={() => setIsChangePasswordOpen(true)}>
+                  <Shield className="size-4 text-[#004aad]" />
+                  Alterar senha
+                </DropdownMenuItem>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem className="rounded-xl px-3 py-2" onSelect={() => void handleLogout()}>
+                  <LogOut className="size-4 text-[#004aad]" />
+                  Sair
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          </div>
+        </div>
+
+        {isMobileMenuOpen ? (
+          <div className="border-t border-border/50 bg-background/95 px-4 py-4 md:hidden">
+            <nav className="flex flex-col gap-3">
+              <Link
+                href="/dashboard"
+                onClick={closeMobileMenu}
+                className="rounded-2xl border border-border/60 bg-white/80 px-4 py-3 text-sm text-foreground transition hover:border-[#5de0e6]/60"
+              >
+                Início
+              </Link>
               <button
                 type="button"
-                className="inline-flex items-center justify-center rounded-full border border-border/60 bg-white/80 p-1 text-foreground transition hover:border-[#5de0e6]/60"
+                onClick={() => {
+                  closeMobileMenu()
+                  setIsTripsOpen(true)
+                }}
+                className="rounded-2xl border border-border/60 bg-white/80 px-4 py-3 text-left text-sm text-foreground transition hover:border-[#5de0e6]/60"
               >
-                <Avatar className="size-10">
-                  <AvatarFallback className="bg-[linear-gradient(135deg,#5de0e6,#004aad)] text-sm font-semibold text-white">
-                    {user.name.slice(0, 1).toUpperCase()}
-                  </AvatarFallback>
-                </Avatar>
+                Minhas viagens
               </button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className="w-64 rounded-2xl border-border/60 p-2">
-              <DropdownMenuLabel className="px-3 py-2">
-                <div className="text-sm font-semibold text-foreground">{profileForm.name}</div>
-                <div className="mt-1 text-xs font-normal text-muted-foreground">{profileForm.email}</div>
-              </DropdownMenuLabel>
-              <DropdownMenuSeparator />
-              <DropdownMenuItem className="rounded-xl px-3 py-2" onSelect={() => setIsEditProfileOpen(true)}>
-                <User className="size-4 text-[#004aad]" />
-                Editar perfil
-              </DropdownMenuItem>
-              <DropdownMenuItem className="rounded-xl px-3 py-2" onSelect={() => setIsChangePasswordOpen(true)}>
-                <Shield className="size-4 text-[#004aad]" />
-                Alterar senha
-              </DropdownMenuItem>
-              <DropdownMenuSeparator />
-              <DropdownMenuItem className="rounded-xl px-3 py-2" onSelect={() => void handleLogout()}>
-                <LogOut className="size-4 text-[#004aad]" />
-                Sair
-              </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
-        </div>
+              <button
+                type="button"
+                onClick={() => {
+                  closeMobileMenu()
+                  setIsCreditsOpen(true)
+                }}
+                className="rounded-2xl border border-border/60 bg-white/80 px-4 py-3 text-left text-sm text-foreground transition hover:border-[#5de0e6]/60"
+              >
+                Créditos
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  closeMobileMenu()
+                  setIsHelpOpen(true)
+                }}
+                className="rounded-2xl border border-border/60 bg-white/80 px-4 py-3 text-left text-sm text-foreground transition hover:border-[#5de0e6]/60"
+              >
+                Ajuda
+              </button>
+              <Link
+                href="/dashboard#nova-busca"
+                onClick={closeMobileMenu}
+                className="rounded-2xl border border-border/60 bg-white/80 px-4 py-3 text-sm text-foreground transition hover:border-[#5de0e6]/60"
+              >
+                Nova busca
+              </Link>
+            </nav>
+          </div>
+        ) : null}
       </header>
 
       <Dialog open={isTripsOpen} onOpenChange={setIsTripsOpen}>
@@ -181,22 +248,22 @@ export function DashboardHeader({ user, searches = [] }: { user: DashboardUser; 
 
             <div className="mt-6 flex-1 overflow-y-auto pr-1">
               <div className="space-y-3">
-              {searches.map((search) => (
-                <Link
-                  key={search.id}
-                  href={`/dashboard/resultado?tripId=${encodeURIComponent(search.id)}`}
-                  className="flex items-center justify-between rounded-2xl border border-border/60 px-4 py-4 transition hover:border-[#5de0e6]/60"
-                >
-                  <div>
-                    <div className="text-sm font-medium text-foreground">{search.destination}</div>
-                    <div className="text-sm text-muted-foreground">{search.input}</div>
-                  </div>
-                  <div className="text-right">
-                    <div className="text-sm font-medium text-foreground">{search.estimatedCost}</div>
-                    <div className="text-xs text-muted-foreground">{formatShortDate(search.createdAt)}</div>
-                  </div>
-                </Link>
-              ))}
+                {searches.map((search) => (
+                  <Link
+                    key={search.id}
+                    href={`/dashboard/resultado?tripId=${encodeURIComponent(search.id)}`}
+                    className="flex items-center justify-between rounded-2xl border border-border/60 px-4 py-4 transition hover:border-[#5de0e6]/60"
+                  >
+                    <div>
+                      <div className="text-sm font-medium text-foreground">{search.destination}</div>
+                      <div className="text-sm text-muted-foreground">{search.input}</div>
+                    </div>
+                    <div className="text-right">
+                      <div className="text-sm font-medium text-foreground">{search.estimatedCost}</div>
+                      <div className="text-xs text-muted-foreground">{formatShortDate(search.createdAt)}</div>
+                    </div>
+                  </Link>
+                ))}
               </div>
             </div>
           </div>
@@ -212,7 +279,7 @@ export function DashboardHeader({ user, searches = [] }: { user: DashboardUser; 
                 Créditos
               </DialogTitle>
               <DialogDescription className="text-muted-foreground">
-                Consulte seus créditos disponíveis e os pacotes mockados do dashboard.
+                Consulte seus créditos disponíveis e os pacotes do dashboard.
               </DialogDescription>
             </DialogHeader>
 
@@ -266,49 +333,37 @@ export function DashboardHeader({ user, searches = [] }: { user: DashboardUser; 
             <div className="mt-6 rounded-2xl border border-border/60 bg-white/80 px-5 py-3">
               <Accordion type="single" collapsible className="w-full">
                 <AccordionItem value="help-1">
-                  <AccordionTrigger className="text-foreground hover:no-underline">
-                    Como funciona o VUEI?
-                  </AccordionTrigger>
+                  <AccordionTrigger className="text-foreground hover:no-underline">Como funciona o VUEI?</AccordionTrigger>
                   <AccordionContent className="leading-6 text-muted-foreground">
                     O VUEI usa inteligência artificial para sugerir destinos, estimar custos e montar roteiros em poucos segundos.
                   </AccordionContent>
                 </AccordionItem>
                 <AccordionItem value="help-2">
-                  <AccordionTrigger className="text-foreground hover:no-underline">
-                    Como os créditos são consumidos?
-                  </AccordionTrigger>
+                  <AccordionTrigger className="text-foreground hover:no-underline">Como os créditos são consumidos?</AccordionTrigger>
                   <AccordionContent className="leading-6 text-muted-foreground">
                     Cada viagem gerada consome 1 crédito. O roteiro completo e o download em PDF não consomem créditos.
                   </AccordionContent>
                 </AccordionItem>
                 <AccordionItem value="help-3">
-                  <AccordionTrigger className="text-foreground hover:no-underline">
-                    Posso usar o quiz?
-                  </AccordionTrigger>
+                  <AccordionTrigger className="text-foreground hover:no-underline">Posso usar o quiz?</AccordionTrigger>
                   <AccordionContent className="leading-6 text-muted-foreground">
                     Sim. O quiz ajuda quem ainda não sabe para onde viajar. Ao finalizar, o VUEI sugere uma viagem com base nas suas respostas.
                   </AccordionContent>
                 </AccordionItem>
                 <AccordionItem value="help-4">
-                  <AccordionTrigger className="text-foreground hover:no-underline">
-                    O custo da viagem é preço real?
-                  </AccordionTrigger>
+                  <AccordionTrigger className="text-foreground hover:no-underline">O custo da viagem é preço real?</AccordionTrigger>
                   <AccordionContent className="leading-6 text-muted-foreground">
                     Não. Nesta versão, os valores são estimativas para ajudar na decisão inicial.
                   </AccordionContent>
                 </AccordionItem>
                 <AccordionItem value="help-5">
-                  <AccordionTrigger className="text-foreground hover:no-underline">
-                    Posso baixar meu roteiro?
-                  </AccordionTrigger>
+                  <AccordionTrigger className="text-foreground hover:no-underline">Posso baixar meu roteiro?</AccordionTrigger>
                   <AccordionContent className="leading-6 text-muted-foreground">
                     Sim. Após gerar uma viagem, você pode baixar o roteiro em PDF.
                   </AccordionContent>
                 </AccordionItem>
                 <AccordionItem value="help-6">
-                  <AccordionTrigger className="text-foreground hover:no-underline">
-                    Como compro mais créditos?
-                  </AccordionTrigger>
+                  <AccordionTrigger className="text-foreground hover:no-underline">Como compro mais créditos?</AccordionTrigger>
                   <AccordionContent className="leading-6 text-muted-foreground">
                     Clique em Créditos no dashboard e escolha o pacote desejado.
                   </AccordionContent>
@@ -318,9 +373,7 @@ export function DashboardHeader({ user, searches = [] }: { user: DashboardUser; 
 
             <div className="mt-5 rounded-2xl border border-border/60 bg-secondary/35 px-5 py-5">
               <div className="text-lg font-semibold text-foreground">Precisa de ajuda?</div>
-              <p className="mt-2 text-sm leading-6 text-muted-foreground">
-                Fale com o suporte VUEI pelo WhatsApp.
-              </p>
+              <p className="mt-2 text-sm leading-6 text-muted-foreground">Fale com o suporte VUEI pelo WhatsApp.</p>
               <div className="mt-2 text-sm font-medium text-foreground">(54) 99990-2688</div>
               <DialogFooter className="mt-5">
                 <Link

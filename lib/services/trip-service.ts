@@ -21,6 +21,20 @@ const aiTripSchema = z.object({
 
 const MIN_TRIP_COST = 300
 const MAX_TRIP_COST = 50000
+const MONTH_LABELS = [
+  "janeiro",
+  "fevereiro",
+  "março",
+  "abril",
+  "maio",
+  "junho",
+  "julho",
+  "agosto",
+  "setembro",
+  "outubro",
+  "novembro",
+  "dezembro",
+] as const
 
 function formatTripCost(value: number) {
   return new Intl.NumberFormat("pt-BR", {
@@ -82,6 +96,52 @@ function resolveDurationDays(request: TripGenerationInput) {
   if (normalizedInput.includes("11 dias") || normalizedInput.includes("12 dias") || normalizedInput.includes("duas semanas")) return 12
 
   return 5
+}
+
+function resolveDurationLabel(request: TripGenerationInput) {
+  if (request.quizAnswers) {
+    switch (request.quizAnswers.duration) {
+      case "fim-de-semana":
+        return "3 dias"
+      case "4-6-dias":
+        return "5 dias"
+      case "7-10-dias":
+        return "8 dias"
+      case "11+-dias":
+        return "12 dias"
+    }
+  }
+
+  const normalizedInput = request.inputText?.toLowerCase() ?? ""
+  const explicitDayMatch = normalizedInput.match(/(\d{1,2})\s*dias?/)
+
+  if (explicitDayMatch) {
+    return `${explicitDayMatch[1]} dias`
+  }
+
+  if (normalizedInput.includes("fim de semana")) return "3 dias"
+  if (normalizedInput.includes("duas semanas")) return "14 dias"
+
+  return `${resolveDurationDays(request)} dias`
+}
+
+function resolvePeriodLabel(request: TripGenerationInput) {
+  const normalizedInput = request.inputText?.toLowerCase() ?? ""
+  const dateRangeMatch = normalizedInput.match(
+    /(\d{1,2})\s*(?:a|-|até)\s*(\d{1,2})\s+de\s+(janeiro|fevereiro|março|abril|maio|junho|julho|agosto|setembro|outubro|novembro|dezembro)/i,
+  )
+
+  if (dateRangeMatch) {
+    return `${dateRangeMatch[1]} a ${dateRangeMatch[2]} de ${dateRangeMatch[3].toLowerCase()}`
+  }
+
+  const monthMatch = MONTH_LABELS.find((month) => normalizedInput.includes(month))
+
+  if (monthMatch) {
+    return monthMatch.charAt(0).toUpperCase() + monthMatch.slice(1)
+  }
+
+  return undefined
 }
 
 function resolveTravelTier(request: TripGenerationInput, bestFor: string) {
@@ -147,10 +207,14 @@ function normalizeTripResult(result: TripResult, request?: TripGenerationInput):
   const normalizedCost = request
     ? normalizeEstimatedCost(result.estimatedCost, request, result.bestFor)
     : result.estimatedCost
+  const periodLabel = request ? resolvePeriodLabel(request) : result.periodLabel
+  const durationLabel = request ? resolveDurationLabel(request) : result.durationLabel
 
   return {
     ...result,
     estimatedCost: normalizedCost,
+    periodLabel,
+    durationLabel,
     fullItinerary: result.fullItinerary ?? result.itinerary,
   }
 }

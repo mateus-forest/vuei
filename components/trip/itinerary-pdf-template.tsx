@@ -6,6 +6,8 @@ export function ItineraryPdfTemplate({
   destination,
   estimatedCost,
   originSubtitle,
+  periodLabel,
+  durationLabel,
   summary,
   itinerary,
   detailedItinerary,
@@ -14,6 +16,8 @@ export function ItineraryPdfTemplate({
   destination: TripResult["destination"]
   estimatedCost: TripResult["estimatedCost"]
   originSubtitle: string
+  periodLabel?: TripResult["periodLabel"]
+  durationLabel?: TripResult["durationLabel"]
   summary: string
   itinerary: TripResult["itinerary"]
   detailedItinerary: string[]
@@ -331,8 +335,8 @@ export function ItineraryPdfTemplate({
               <div style={printStyles.metaValue}>{estimatedCost}</div>
             </div>
             <div style={printStyles.metaItem}>
-              <div style={printStyles.metaTitle}>Contexto</div>
-              <div style={printStyles.metaValue}>Roteiro VUEI personalizado</div>
+              <div style={printStyles.metaTitle}>Período</div>
+              <div style={printStyles.metaValue}>{periodLabel ?? durationLabel ?? "Período não informado"}</div>
             </div>
           </div>
         </section>

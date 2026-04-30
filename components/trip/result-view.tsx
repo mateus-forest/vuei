@@ -276,6 +276,7 @@ export function ResultView({
   const travelersCount = inferTravelers(activeResult.bestFor)
   const daysCount = Math.max(activePeriodItinerary.length, activeResult.itinerary.length, 1)
   const costPerTraveler = Math.max(300, Math.round(activeCost / travelersCount))
+  const tripPeriodText = activeResult.periodLabel ?? activeResult.durationLabel ?? "Período não informado"
 
   const originSubtitle =
     source === "quiz"
@@ -413,6 +414,7 @@ export function ResultView({
                 <div className="mt-2 text-sm text-muted-foreground">
                   Baseado em {formatTravelerLabel(travelersCount)} por {daysCount} {daysCount === 1 ? "dia" : "dias"}
                 </div>
+                <div className="mt-2 text-sm text-muted-foreground">Período: {tripPeriodText}</div>
                 <div className="mt-2 text-sm text-muted-foreground">Ideal para {activeResult.bestFor}</div>
               </div>
             </div>
@@ -875,6 +877,8 @@ export function ResultView({
             destination={activeResult.destination}
             estimatedCost={activeResult.estimatedCost}
             originSubtitle={originSubtitle}
+            periodLabel={activeResult.periodLabel}
+            durationLabel={activeResult.durationLabel}
             summary={activeResult.summary}
             itinerary={activeResult.itinerary}
             detailedItinerary={activeDetailedItinerary}

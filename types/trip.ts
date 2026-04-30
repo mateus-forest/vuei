@@ -5,6 +5,8 @@ export type TripResult = {
   estimatedCost: string
   bestFor: string
   summary: string
+  periodLabel?: string
+  durationLabel?: string
   itinerary: string[]
   fullItinerary?: string[]
   tips: string[]
