@@ -19,6 +19,10 @@ function mapSearchRowToSearch(row: SearchRow): Search {
   const context = typeof rawResult.context === "string" ? rawResult.context : `Busca via ${row.source}`
   const periodLabel = typeof rawResult.periodLabel === "string" ? rawResult.periodLabel : undefined
   const durationLabel = typeof rawResult.durationLabel === "string" ? rawResult.durationLabel : undefined
+  const intelligence =
+    typeof rawResult.intelligence === "object" && rawResult.intelligence !== null
+      ? (rawResult.intelligence as TripResult["intelligence"])
+      : undefined
 
   const result: TripResult = {
     destination,
@@ -31,6 +35,7 @@ function mapSearchRowToSearch(row: SearchRow): Search {
     fullItinerary,
     tips,
     context,
+    intelligence,
   }
 
   return {

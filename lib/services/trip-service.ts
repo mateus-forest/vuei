@@ -6,6 +6,7 @@ import { getOpenAIServerClient } from "@/lib/openai/server"
 import { CREDITS_PER_GENERATED_TRIP } from "@/lib/services/credit-service"
 import { getCurrentUser } from "@/lib/services/user-service"
 import { createSupabaseAdminClient } from "@/lib/supabase/server"
+import { buildTripIntelligence } from "@/lib/travel/travel-intelligence"
 import type { AppSession } from "@/types/session"
 import type {
   QuizAnswer,
@@ -680,6 +681,7 @@ function normalizeTripResult(result: TripResult, request?: TripGenerationInput):
   const normalizedCost = request ? normalizeEstimatedCost(result.estimatedCost, request, bestFor) : result.estimatedCost
   const periodData = request ? resolvePeriodData(request) : null
   const travelers = request ? inferTravelers(request, bestFor) : result.travelers ?? 2
+  const intelligence = request ? buildTripIntelligence(result.destination, request).intelligence : result.intelligence
 
   return {
     ...result,
@@ -693,6 +695,7 @@ function normalizeTripResult(result: TripResult, request?: TripGenerationInput):
     travelers,
     currency: "BRL",
     fullItinerary: result.fullItinerary ?? result.itinerary,
+    intelligence,
   }
 }
 
@@ -868,6 +871,12 @@ export function generateTrip(request: TripGenerationInput): TripGenerationRespon
 
 export async function generateTripWithAI(request: TripGenerationInput) {
   const client = getOpenAIServerClient()
+  const destinationHint =
+    extractDestinationFromInput(request.inputText) ??
+    (request.origin === "quiz" && request.quizAnswers ? generateTripFromQuiz(request.quizAnswers).destination : undefined)
+  const backendPresentationContext = destinationHint
+    ? JSON.stringify(buildTripIntelligence(destinationHint, request), null, 2)
+    : "Sem dados estruturados adicionais do backend."
 
   console.time("openai-call")
 
@@ -884,6 +893,7 @@ export async function generateTripWithAI(request: TripGenerationInput) {
               text: [
                 "Responda em português do Brasil, com acentuação correta, e devolva apenas JSON estruturado.",
                 "Você é um planejador de viagens para público brasileiro.",
+                "Você é a camada de apresentação do VUEI. Não invente scores, custos ou dados estruturados. Use os dados calculados pelo backend como fonte principal. Sua função é explicar, humanizar, organizar o roteiro e deixar claras as premissas.",
                 "Você não pode retornar valores genéricos. Os valores devem variar de acordo com destino, duração, quantidade de pessoas e perfil de viagem. Sempre explique as premissas usadas.",
                 "Sempre interprete o destino pedido, o período informado, a duração estimada e a quantidade de pessoas.",
                 "Use sempre moeda BRL.",
@@ -892,6 +902,7 @@ export async function generateTripWithAI(request: TripGenerationInput) {
                 "O breakdown é obrigatório e deve incluir: passagens, hospedagem, alimentação, transporte local e passeios.",
                 "Não invente preço exato de passagem ou hotel; trate tudo como estimativa realista.",
                 "Sempre inclua três variações: economic, intermediate e premium.",
+                "Se houver scores e explicações do backend, use esses valores literalmente como referência.",
               ].join(" "),
             },
           ],
@@ -902,6 +913,11 @@ export async function generateTripWithAI(request: TripGenerationInput) {
             {
               type: "input_text",
               text: buildUserPrompt(request),
+            },
+            {
+              type: "input_text",
+              text: `Contexto estruturado do backend VUEI:
+${backendPresentationContext}`,
             },
           ],
         },

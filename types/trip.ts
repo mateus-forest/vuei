@@ -18,6 +18,42 @@ export type TripVariant = {
   itinerary: string[]
 }
 
+export type TripDataConfidence = "high" | "medium" | "low"
+
+export type OvercrowdingLabel = "tranquilo" | "moderado" | "muito cheio"
+
+export type SmartTimingLabel = "Boa janela de compra" | "Preço razoável" | "Pode estar mais caro que o normal"
+
+export type TravelExplanation = {
+  summary: string
+  reasons: string[]
+  warnings: string[]
+  strongestPoint: string
+  attentionPoint: string
+}
+
+export type OvercrowdingInsight = {
+  score: number
+  label: OvercrowdingLabel
+}
+
+export type SmartTimingInsight = {
+  score: number
+  label: SmartTimingLabel
+}
+
+export type TripIntelligence = {
+  destinationMatchScore: number
+  affordabilityScore: number
+  smartTimingScore: SmartTimingInsight
+  experienceScore: number
+  climateComfortScore: number
+  overcrowdingIndex: OvercrowdingInsight
+  routeComfortScore: number
+  explanation: TravelExplanation
+  dataConfidence: TripDataConfidence
+}
+
 export type TripResult = {
   destination: string
   estimatedCost: string
@@ -36,6 +72,7 @@ export type TripResult = {
   tips: string[]
   context: string
   cheapestAlternative?: string
+  intelligence?: TripIntelligence
 }
 
 export type QuizAnswer = {

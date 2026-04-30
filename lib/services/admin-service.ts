@@ -47,6 +47,10 @@ function mapSearchRowToSearch(row: SearchRow): Search {
   const summary = typeof rawResult.summary === "string" ? rawResult.summary : row.prompt
   const bestFor = typeof rawResult.bestFor === "string" ? rawResult.bestFor : "indefinido"
   const context = typeof rawResult.context === "string" ? rawResult.context : `Busca via ${row.source}`
+  const intelligence =
+    typeof rawResult.intelligence === "object" && rawResult.intelligence !== null
+      ? (rawResult.intelligence as TripResult["intelligence"])
+      : undefined
 
   const result: TripResult = {
     destination,
@@ -57,6 +61,7 @@ function mapSearchRowToSearch(row: SearchRow): Search {
     fullItinerary,
     tips,
     context,
+    intelligence,
   }
 
   return {
