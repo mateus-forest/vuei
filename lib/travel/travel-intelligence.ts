@@ -9,6 +9,7 @@ import type {
   TripIntelligence,
 } from "@/types/trip"
 import { travelKnowledgeBase, travelRegionFallbacks, type TravelDestinationData } from "@/lib/travel/travelKnowledgeBase"
+import { defaultTripProfile, resolveTripProfileFallback, sanitizeTripProfileInput } from "@/lib/travel/trip-profile"
 
 export type UserTravelProfile = {
   budgetLevel: "low" | "medium" | "high"
@@ -171,7 +172,7 @@ function inferTravelStyle(request: TripGenerationInput) {
     return request.profile.style
   }
 
-  return request.quizAnswers?.tripStyle ?? "equilibrado"
+  return request.quizAnswers?.tripStyle ?? "geral"
 }
 
 function inferPace(request: TripGenerationInput, durationDays: number) {
@@ -266,16 +267,24 @@ export function findDestinationKnowledge(destination: string, request: TripGener
 
 export function buildUserTravelProfile(request: TripGenerationInput, destination?: string): UserTravelProfile {
   const durationDays = resolveDurationDays(request)
-  const travelStyle = inferTravelStyle(request)
+  const normalizedProfile = sanitizeTripProfileInput(request.profile)
+  const profile = resolveTripProfileFallback(request.profile)
+  const profileRequest = normalizedProfile
+    ? {
+        ...request,
+        profile: normalizedProfile,
+      }
+    : undefined
+  const travelStyle = profileRequest ? inferTravelStyle(profileRequest) : defaultTripProfile.style
   const text = normalizeText(request.inputText)
   const vibe = request.quizAnswers?.vibe
-  const preferences = new Set(request.profile?.preferences ?? [])
-  const flightPreference = request.profile?.flightPreference
+  const preferences = new Set(profile.preferences)
+  const flightPreference = profile.flightPreference
 
   return {
-    budgetLevel: inferBudgetLevel(request),
+    budgetLevel: profileRequest ? inferBudgetLevel(profileRequest) : "medium",
     travelStyle,
-    pace: inferPace(request, durationDays),
+    pace: profileRequest ? inferPace(profileRequest, durationDays) : "balanced",
     prefersNature:
       preferences.has("natureza") || vibe === "natureza" || text.includes("natureza") || text.includes("trilha") || travelStyle === "aventura",
     prefersCulture:
@@ -287,8 +296,8 @@ export function buildUserTravelProfile(request: TripGenerationInput, destination
     prefersShopping: preferences.has("compras") || text.includes("compras") || text.includes("outlet"),
     prefersParks: preferences.has("parques-atracoes") || text.includes("parques") || text.includes("atracoes"),
     prefersLuxury:
-      request.profile?.style === "luxo" ||
-      request.profile?.priceSensitivity === "premium" ||
+      profile.style === "luxo" ||
+      profile.priceSensitivity === "premium" ||
       vibe === "luxo" ||
       travelStyle === "luxo" ||
       text.includes("luxo") ||

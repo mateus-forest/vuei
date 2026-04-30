@@ -3,6 +3,7 @@ import { z } from "zod"
 import { getServerSession } from "@/lib/services/server-session-service"
 import { generateAndPersistTrip, generateTripWithAI } from "@/lib/services/trip-service"
 import { createSupabaseAdminClient } from "@/lib/supabase/server"
+import { sanitizeTripProfileInput } from "@/lib/travel/trip-profile"
 
 const quizAnswersSchema = z.object({
   tripStyle: z.enum(["solo", "romantica", "familia", "aventura", "descanso", "luxo", "cultural"]),
@@ -13,20 +14,21 @@ const quizAnswersSchema = z.object({
 })
 
 const tripProfileSchema = z.object({
-  style: z.enum(["familia", "casal", "amigos", "solo", "trabalho", "luxo", "aventura", "relaxamento"]).optional(),
-  pace: z.enum(["tranquilo", "equilibrado", "intenso"]).optional(),
+  style: z.enum(["familia", "casal", "amigos", "solo", "trabalho", "luxo", "aventura", "relaxamento"]).optional().nullable(),
+  pace: z.enum(["tranquilo", "equilibrado", "intenso"]).optional().nullable(),
   preferences: z
     .array(z.enum(["praia", "natureza", "cultura", "gastronomia", "vida-noturna", "neve-frio", "compras", "parques-atracoes"]))
-    .optional(),
-  priceSensitivity: z.enum(["economico", "intermediario", "premium"]).optional(),
-  flightPreference: z.enum(["voos-curtos", "aceito-conexoes", "evitar-conexoes", "nao-importa"]).optional(),
+    .optional()
+    .nullable(),
+  priceSensitivity: z.enum(["economico", "intermediario", "premium"]).optional().nullable(),
+  flightPreference: z.enum(["voos-curtos", "aceito-conexoes", "evitar-conexoes", "nao-importa"]).optional().nullable(),
 })
 
 const generateTripPayloadSchema = z.object({
   origin: z.enum(["busca", "quiz", "sugestao"]).optional(),
   input: z.string().optional(),
   quizAnswers: quizAnswersSchema.optional(),
-  profile: tripProfileSchema.optional(),
+  profile: tripProfileSchema.optional().nullable(),
 })
 
 function jsonOk(data: unknown, init?: ResponseInit) {
@@ -56,6 +58,7 @@ export async function POST(request: Request) {
 
   const body = parsedPayload.data
   const origin = body.origin ?? "busca"
+  const profile = sanitizeTripProfileInput(body.profile)
   const session = await getServerSession()
 
   console.debug("Trip generation request received", {
@@ -72,7 +75,7 @@ export async function POST(request: Request) {
           origin,
           inputText: body.input?.trim() || "quero viajar para europa com 5 mil reais",
           quizAnswers: body.quizAnswers,
-          profile: body.profile,
+          profile,
         })
 
         let publicSearchId: string | undefined
@@ -135,7 +138,7 @@ export async function POST(request: Request) {
         origin,
         inputText: body.input?.trim(),
         quizAnswers: body.quizAnswers,
-        profile: body.profile,
+        profile,
         userId: session.userId ?? undefined,
       },
     })
