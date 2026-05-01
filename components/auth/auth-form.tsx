@@ -3,10 +3,10 @@
 import Link from "next/link"
 import { useState } from "react"
 import { ArrowRight, LockKeyhole, Mail, User2 } from "lucide-react"
-import { sendPasswordReset, signInWithPassword, signUpWithPassword } from "@/lib/services/session-service"
-import { GradientButton } from "@/components/ui/gradient-button"
 import { BrandCard } from "@/components/ui/brand-card"
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog"
+import { GradientButton } from "@/components/ui/gradient-button"
+import { sendPasswordReset, signInWithPassword, signUpWithPassword } from "@/lib/services/session-service"
 
 type BootstrapProfileResponse =
   | { ok: true; data: { profileId: string } }
@@ -137,7 +137,7 @@ export function AuthForm({ mode }: { mode: "login" | "signup" }) {
       }
 
       if (!data.session) {
-        setAuthError("Conta criada. Confirme seu email antes de entrar.")
+        setAuthError("Conta criada. Confirme seu e-mail antes de entrar.")
         return
       }
 
@@ -164,7 +164,7 @@ export function AuthForm({ mode }: { mode: "login" | "signup" }) {
       return
     }
 
-    setRecoveryFeedback("Enviamos as instruções de recuperação para seu email.")
+    setRecoveryFeedback("Enviamos as instruções de recuperação para o seu e-mail.")
   }
 
   return (
@@ -196,7 +196,7 @@ export function AuthForm({ mode }: { mode: "login" | "signup" }) {
           ) : null}
 
           <label className="block">
-            <span className="mb-2 block text-sm font-medium text-foreground">Email</span>
+            <span className="mb-2 block text-sm font-medium text-foreground">E-mail</span>
             <div className="relative">
               <Mail className="absolute left-4 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
               <input
@@ -267,13 +267,13 @@ export function AuthForm({ mode }: { mode: "login" | "signup" }) {
             <DialogHeader>
               <DialogTitle className="font-heading text-2xl text-foreground">Esqueci minha senha</DialogTitle>
               <DialogDescription className="text-muted-foreground">
-                Informe seu email para receber as instruções de recuperação.
+                Informe seu e-mail para receber as instruções de recuperação.
               </DialogDescription>
             </DialogHeader>
 
             <div className="mt-6 space-y-4">
               <label className="block">
-                <span className="mb-2 block text-sm font-medium text-foreground">Email</span>
+                <span className="mb-2 block text-sm font-medium text-foreground">E-mail</span>
                 <div className="relative">
                   <Mail className="absolute left-4 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
                   <input

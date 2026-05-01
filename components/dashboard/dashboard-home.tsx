@@ -1,12 +1,12 @@
 import Link from "next/link"
 import { History, Sparkles, Wallet } from "lucide-react"
+import { AiTripForm } from "@/components/trip/ai-trip-form"
+import { BrandBadge } from "@/components/ui/brand-badge"
+import { BrandCard } from "@/components/ui/brand-card"
+import { GradientButton } from "@/components/ui/gradient-button"
 import { formatShortDate } from "@/lib/utils/format"
 import type { Search } from "@/types/search"
 import type { User } from "@/types/user"
-import { AiTripForm } from "@/components/trip/ai-trip-form"
-import { BrandCard } from "@/components/ui/brand-card"
-import { BrandBadge } from "@/components/ui/brand-badge"
-import { GradientButton } from "@/components/ui/gradient-button"
 
 export function DashboardHome({ user, searches }: { user: User; searches: Search[] }) {
   return (
@@ -23,10 +23,7 @@ export function DashboardHome({ user, searches }: { user: User; searches: Search
               Refaça buscas, acompanhe o histórico e continue explorando sem sair do mesmo universo visual da landing.
             </p>
             <div className="mt-8">
-              <AiTripForm
-                placeholder="Ex: Quero uma viagem barata para descansar em agosto"
-                redirectTo="/dashboard/resultado"
-              />
+              <AiTripForm placeholder="Ex: Quero uma viagem barata para descansar em agosto" redirectTo="/dashboard/resultado" />
             </div>
           </BrandCard>
         </div>

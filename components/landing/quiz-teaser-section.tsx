@@ -6,10 +6,10 @@ import { GradientButton } from "@/components/ui/gradient-button"
 import { SectionShell } from "@/components/ui/section-shell"
 
 const tripTypes = [
-  { icon: Heart, label: "Romantica" },
-  { icon: Users, label: "Familia" },
+  { icon: Heart, label: "Romântica" },
+  { icon: Users, label: "Família" },
   { icon: Mountain, label: "Aventura" },
-  { icon: Briefcase, label: "Pratica" },
+  { icon: Briefcase, label: "Prática" },
 ]
 
 export function QuizTeaserSection() {
@@ -20,11 +20,11 @@ export function QuizTeaserSection() {
         <div className="mb-10 text-center">
           <BrandBadge className="mb-5">
             <Compass className="size-4 text-[#5de0e6]" />
-            Descoberta rapida
+            Descoberta rápida
           </BrandBadge>
-          <h2 className="font-heading text-3xl font-bold text-foreground sm:text-4xl lg:text-5xl">Nao sabe por onde comecar?</h2>
+          <h2 className="font-heading text-3xl font-bold text-foreground sm:text-4xl lg:text-5xl">Não sabe por onde começar?</h2>
           <p className="mx-auto mt-4 max-w-xl text-lg text-muted-foreground">
-            Responda rapido e deixe o quiz encaixar estilo, orçamento e clima em uma sugestao clara.
+            Responda rápido e deixe o quiz encaixar estilo, orçamento e clima em uma sugestão clara.
           </p>
         </div>
 
@@ -55,7 +55,7 @@ export function QuizTeaserSection() {
                 </div>
                 <ul className="space-y-3 text-sm text-muted-foreground">
                   <li>Estilo de viagem, orçamento, duração e vibe</li>
-                  <li>Sugestao imediata com custo estimado</li>
+                  <li>Sugestão imediata com custo estimado</li>
                   <li>Redirecionamento direto para o resultado</li>
                 </ul>
                 <GradientButton asChild size="lg" className="mt-2 w-full">

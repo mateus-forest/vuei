@@ -69,14 +69,14 @@ export function applySeasonalityMultiplier(
 
 export function getSeasonalityPriceMessage(multiplier: number) {
   if (multiplier > 1.2) {
-    return "Os precos estao mais altos devido a alta temporada no periodo selecionado."
+    return "Os preços estão mais altos devido à alta temporada no período selecionado."
   }
 
   if (multiplier < 0.9) {
-    return "Os precos estao mais acessiveis por ser um periodo de menor demanda."
+    return "Os preços estão mais acessíveis por ser um período de menor demanda."
   }
 
-  return "Os precos estao dentro da media para o periodo."
+  return "Os preços estão dentro da média para o período."
 }
 
 export function scaleBreakdownToTotal(breakdown: TripCostBreakdown, targetTotal: number): TripCostBreakdown {

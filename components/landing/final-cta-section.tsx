@@ -12,7 +12,7 @@ export function FinalCtaSection() {
       <div className="relative mx-auto max-w-4xl text-center">
         <h2 className="font-heading text-3xl font-bold text-foreground sm:text-4xl lg:text-5xl">
           Pronto para descobrir sua{" "}
-          <span className="bg-[linear-gradient(90deg,#5de0e6,#004aad)] bg-clip-text text-transparent">proxima viagem</span>?
+          <span className="bg-[linear-gradient(90deg,#5de0e6,#004aad)] bg-clip-text text-transparent">próxima viagem</span>?
         </h2>
         <p className="mx-auto mt-5 max-w-2xl text-lg text-muted-foreground">
           Comece com uma busca gratuita, valide a ideia em segundos e siga com login quando quiser continuar.
@@ -20,7 +20,7 @@ export function FinalCtaSection() {
         <div className="mt-9 flex flex-wrap justify-center gap-3">
           <GradientButton asChild size="lg" className="px-8">
             <Link href="/resultado?input=quero%20viajar%20para%20europa%20com%205%20mil%20reais">
-              Gerar simulacao
+              Gerar simulação
               <ArrowRight className="size-5" />
             </Link>
           </GradientButton>

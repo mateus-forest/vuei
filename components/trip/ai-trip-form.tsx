@@ -45,7 +45,7 @@ const profileLabels: Record<
   TripProfileStyle | TripProfilePace | TripProfilePreference | TripProfilePriceSensitivity | TripProfileFlightPreference,
   string
 > = {
-  familia: "Familia",
+  familia: "Família",
   casal: "Casal",
   amigos: "Amigos",
   solo: "Solo",
@@ -61,16 +61,16 @@ const profileLabels: Record<
   cultura: "Cultura",
   gastronomia: "Gastronomia",
   "vida-noturna": "Vida noturna",
-  "neve-frio": "Neve/frio",
+  "neve-frio": "Neve e frio",
   compras: "Compras",
-  "parques-atracoes": "Parques/atracoes",
-  economico: "Economico",
-  intermediario: "Intermediario",
+  "parques-atracoes": "Parques e atrações",
+  economico: "Econômico",
+  intermediario: "Intermediário",
   premium: "Premium",
   "voos-curtos": "Prefiro voos curtos",
-  "aceito-conexoes": "Aceito conexoes",
-  "evitar-conexoes": "Evitar conexoes",
-  "nao-importa": "Nao importa",
+  "aceito-conexoes": "Aceito conexões",
+  "evitar-conexoes": "Evitar conexões",
+  "nao-importa": "Não importa",
 }
 
 function buildProfilePayload(profile: TripProfileInput): TripProfileInput | undefined {
@@ -124,7 +124,7 @@ function ProfileChoiceButton({
 }
 
 export function AiTripForm({
-  placeholder = "Ex: Quero viajar para Italia com minha familia em julho gastando ate R$ 5.000",
+  placeholder = "Ex: Quero viajar para a Itália com minha família em julho, gastando até R$ 5.000",
   defaultValue = "",
   redirectTo = "/resultado",
   enforceFreeSearchLimit = false,
@@ -151,7 +151,7 @@ export function AiTripForm({
 
   async function handleSubmit() {
     if (!trimmed) {
-      setError("Descreva sua viagem em uma frase para eu montar a simulacao.")
+      setError("Descreva sua viagem em uma frase para eu montar a simulação.")
       return
     }
 
@@ -161,7 +161,7 @@ export function AiTripForm({
     const session = await getClientSession()
 
     if (!session.isAuthenticated && enforceFreeSearchLimit && freeSearchBlocked) {
-      setError("Voce ja usou sua busca gratuita. Crie uma conta para continuar.")
+      setError("Você já usou sua busca gratuita. Crie uma conta para continuar.")
       setIsSubmitting(false)
       return
     }
@@ -182,7 +182,7 @@ export function AiTripForm({
       const payload = await readJsonResponse(response)
 
       if (!response.ok || !payload?.ok) {
-        const message = payload && !payload.ok ? payload.error : "Nao foi possivel gerar sua viagem agora. Tente novamente em instantes."
+        const message = payload && !payload.ok ? payload.error : "Não foi possível gerar sua viagem agora. Tente novamente em instantes."
         setError(message)
         return
       }
@@ -209,7 +209,7 @@ export function AiTripForm({
       })
     } catch (submitError) {
       console.error("Failed to submit trip generation", submitError)
-      setError("Nao foi possivel gerar sua viagem agora. Tente novamente em instantes.")
+      setError("Não foi possível gerar sua viagem agora. Tente novamente em instantes.")
     } finally {
       setIsSubmitting(false)
     }
@@ -270,7 +270,7 @@ export function AiTripForm({
                 <div className="min-w-0 pr-3">
                   <div className="text-sm font-medium text-foreground">Perfil opcional da viagem</div>
                   <div className="mt-1 text-sm leading-5 text-muted-foreground">
-                    Personalize a recomendacao com estilo, ritmo e preferencias
+                    Personalize a recomendação com estilo, ritmo e preferências
                   </div>
                 </div>
               </AccordionTrigger>
@@ -282,7 +282,7 @@ export function AiTripForm({
                     onClick={() => setProfile(emptyProfile)}
                     className="text-left text-xs font-medium text-[#004aad] transition hover:text-[#00357f]"
                   >
-                    Limpar preferencias
+                    Limpar preferências
                   </button>
                 </div>
 
@@ -326,7 +326,7 @@ export function AiTripForm({
                   </div>
 
                   <div>
-                    <div className="mb-3 text-sm font-medium text-foreground">Preferencias</div>
+                    <div className="mb-3 text-sm font-medium text-foreground">Preferências</div>
                     <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-4">
                       {profileOptions.preferences.map((option) => {
                         const checked = profile.preferences?.includes(option) ?? false
@@ -360,7 +360,7 @@ export function AiTripForm({
 
                   <div className="grid gap-5 lg:grid-cols-2">
                     <div>
-                      <div className="mb-3 text-sm font-medium text-foreground">Sensibilidade a preco</div>
+                      <div className="mb-3 text-sm font-medium text-foreground">Sensibilidade a preço</div>
                       <div className="flex flex-wrap gap-2">
                         {profileOptions.priceSensitivity.map((option) => (
                           <ProfileChoiceButton
@@ -379,7 +379,7 @@ export function AiTripForm({
                     </div>
 
                     <div>
-                      <div className="mb-3 text-sm font-medium text-foreground">Preferencia de voo</div>
+                      <div className="mb-3 text-sm font-medium text-foreground">Preferência de voo</div>
                       <div className="flex flex-wrap gap-2">
                         {profileOptions.flightPreference.map((option) => (
                           <ProfileChoiceButton
@@ -421,7 +421,7 @@ export function AiTripForm({
       ) : null}
 
       <div className="flex flex-wrap items-center gap-2 px-1">
-        <span className="text-sm text-muted-foreground">Sugestoes:</span>
+        <span className="text-sm text-muted-foreground">Sugestões:</span>
         {heroSuggestions.map((suggestion) => (
           <button
             key={suggestion}

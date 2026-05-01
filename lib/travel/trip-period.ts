@@ -127,7 +127,7 @@ function parseInputPeriod(request: TripGenerationInput, destinationData?: Travel
       endDate: `${endDay} de ${month}`,
       durationDays,
       isSuggestedPeriod: false,
-      periodReason: "Periodo informado pelo usuario na busca.",
+      periodReason: "Período informado pelo usuário na busca.",
     }
   }
 
@@ -143,7 +143,7 @@ function parseInputPeriod(request: TripGenerationInput, destinationData?: Travel
       startDate: `${startDay} de ${month}`,
       durationDays,
       isSuggestedPeriod: false,
-      periodReason: "Periodo informado pelo usuario na busca.",
+      periodReason: "Período informado pelo usuário na busca.",
     }
   }
 
@@ -154,7 +154,7 @@ function parseInputPeriod(request: TripGenerationInput, destinationData?: Travel
       periodLabel: formatMonthLabel(monthNumber),
       durationDays,
       isSuggestedPeriod: false,
-      periodReason: "Mes informado pelo usuario e preservado como base da viagem.",
+      periodReason: "Mês informado pelo usuário e preservado como base da viagem.",
     }
   }
 
@@ -203,25 +203,25 @@ function buildSuggestedReason(month: number, destinationData: TravelDestinationD
   const reasons = ["clima"]
 
   if (destinationData.lowSeasonMonths.includes(month) || userProfile.budgetLevel === "low") reasons.push("custo")
-  if ((destinationData.crowdIndexByMonth[month] ?? 100) <= 70) reasons.push("lotacao")
+  if ((destinationData.crowdIndexByMonth[month] ?? 100) <= 70) reasons.push("lotação")
   if (userProfile.prefersSnow || userProfile.prefersBeach || userProfile.prefersNature || userProfile.prefersCulture) reasons.push("perfil")
 
   const uniqueReasons = Array.from(new Set(reasons))
-  const baseReason = `Periodo sugerido pelo VUEI com base em ${uniqueReasons.join(", ")} e no perfil da viagem.`
+  const baseReason = `Período sugerido pelo VUEI com base em ${uniqueReasons.join(", ")} e no perfil da viagem.`
 
   if (userProfile.prefersSnow && (climate?.snowProbability ?? 0) > 40) {
-    return `${baseReason} Esse mes aumenta a chance de neve e combina melhor com a proposta do destino.`
+    return `${baseReason} Esse mês aumenta a chance de neve e combina melhor com a proposta do destino.`
   }
 
   if (userProfile.prefersBeach && (climate?.rainProbability ?? 0) <= 40) {
-    return `${baseReason} O clima tende a ficar mais favoravel para praia, com menor risco de chuva.`
+    return `${baseReason} O clima tende a ficar mais favorável para praia, com menor risco de chuva.`
   }
 
   if (destinationData.lowSeasonMonths.includes(month)) {
-    return `${baseReason} A combinacao entre clima mais estavel e menor pressao de preco melhora o custo-beneficio.`
+    return `${baseReason} A combinação entre clima mais estável e menor pressão de preço melhora o custo-benefício.`
   }
 
-  return `${baseReason} O mes escolhido entrega uma boa combinacao entre conforto, custo e experiencia no destino.`
+  return `${baseReason} O mês escolhido entrega uma boa combinação entre conforto, custo e experiência no destino.`
 }
 
 export function resolveTripPeriod(

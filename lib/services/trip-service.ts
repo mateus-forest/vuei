@@ -224,7 +224,7 @@ function resolvePeriodData(request: TripGenerationInput): PeriodData {
       durationDays,
       durationLabel,
       isSuggestedPeriod: false,
-      periodReason: "Periodo ainda nao definido para a viagem.",
+      periodReason: "Período ainda não definido para a viagem.",
     }
   }
 
@@ -244,7 +244,7 @@ function resolvePeriodData(request: TripGenerationInput): PeriodData {
       durationDays,
       durationLabel,
       isSuggestedPeriod: false,
-      periodReason: "Periodo ainda nao definido para a viagem.",
+      periodReason: "Período ainda não definido para a viagem.",
     }
   }
 
@@ -261,7 +261,7 @@ function resolvePeriodData(request: TripGenerationInput): PeriodData {
       durationDays,
       durationLabel,
       isSuggestedPeriod: false,
-      periodReason: "Periodo ainda nao definido para a viagem.",
+      periodReason: "Período ainda não definido para a viagem.",
     }
   }
 
@@ -272,7 +272,7 @@ function resolvePeriodData(request: TripGenerationInput): PeriodData {
       durationDays,
       durationLabel,
       isSuggestedPeriod: false,
-      periodReason: "Mes informado pelo usuario e preservado como base da viagem.",
+      periodReason: "Mês informado pelo usuário e preservado como base da viagem.",
     }
   }
 
@@ -281,7 +281,7 @@ function resolvePeriodData(request: TripGenerationInput): PeriodData {
     durationDays,
     durationLabel,
       isSuggestedPeriod: false,
-      periodReason: "Periodo ainda nao definido para a viagem.",
+      periodReason: "Período ainda não definido para a viagem.",
   }
 }
 
@@ -290,11 +290,11 @@ function resolveTripPeriodData(request: TripGenerationInput, destination?: strin
 
   if (!destination) {
     return {
-      periodLabel: "PerÃ­odo nÃ£o informado",
+      periodLabel: "Período não informado",
       durationDays,
       durationLabel: `${durationDays} ${durationDays === 1 ? "dia" : "dias"}`,
       isSuggestedPeriod: false,
-      periodReason: "Periodo ainda nao definido para a viagem.",
+      periodReason: "Período ainda não definido para a viagem.",
     }
   }
 
@@ -796,7 +796,7 @@ function normalizeTripResult(result: TripResult, request?: TripGenerationInput):
     durationDays: result.durationDays ?? periodData?.durationDays,
     durationLabel: result.durationLabel ?? periodData?.durationLabel,
     isSuggestedPeriod: result.isSuggestedPeriod ?? periodData?.isSuggestedPeriod ?? false,
-    periodReason: result.periodReason ?? periodData?.periodReason ?? "Periodo ainda nao definido para a viagem.",
+    periodReason: result.periodReason ?? periodData?.periodReason ?? "Período ainda não definido para a viagem.",
     travelers,
     currency: "BRL",
     fullItinerary: result.fullItinerary ?? result.itinerary,

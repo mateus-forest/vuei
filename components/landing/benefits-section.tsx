@@ -2,10 +2,10 @@ import { Calculator, Globe, Sparkles, Zap } from "lucide-react"
 import { SectionShell } from "@/components/ui/section-shell"
 
 const benefits = [
-  { icon: Globe, title: "Descubra destinos", description: "Sugestoes alinhadas ao perfil e ao momento da viagem." },
-  { icon: Calculator, title: "Simule custos", description: "Veja o valor estimado cedo para tomar decisao com clareza." },
+  { icon: Globe, title: "Descubra destinos", description: "Sugestões alinhadas ao perfil e ao momento da viagem." },
+  { icon: Calculator, title: "Simule custos", description: "Veja o valor estimado com antecedência para decidir com clareza." },
   { icon: Sparkles, title: "Receba um roteiro", description: "Um resumo dia a dia para enxergar a viagem acontecendo." },
-  { icon: Zap, title: "Decida em segundos", description: "Menos pesquisa manual e mais decisao imediata." },
+  { icon: Zap, title: "Decida em segundos", description: "Menos pesquisa manual e mais decisão imediata." },
 ]
 
 export function BenefitsSection() {
@@ -13,11 +13,11 @@ export function BenefitsSection() {
     <SectionShell id="beneficios">
       <div className="mb-14 text-center">
         <h2 className="font-heading text-3xl font-bold text-foreground sm:text-4xl">
-          Tudo que voce precisa para{" "}
+          Tudo que você precisa para{" "}
           <span className="bg-[linear-gradient(90deg,#5de0e6,#004aad)] bg-clip-text text-transparent">planejar melhor</span>
         </h2>
         <p className="mx-auto mt-4 max-w-2xl text-lg text-muted-foreground">
-          A home continua simples, mas agora vira base real de produto completo.
+          A home continua simples, mas agora serve como base real para um produto completo.
         </p>
       </div>
       <div className="grid gap-6 sm:grid-cols-2 xl:grid-cols-4">

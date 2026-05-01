@@ -1,13 +1,13 @@
 import { LayoutDashboard } from "lucide-react"
 import { redirect } from "next/navigation"
-import { SiteFooter } from "@/components/landing/site-footer"
 import { DashboardHeader } from "@/components/dashboard/dashboard-header"
 import { DashboardHome } from "@/components/dashboard/dashboard-home"
+import { SiteFooter } from "@/components/landing/site-footer"
 import { BrandBadge } from "@/components/ui/brand-badge"
 import { PageIntro } from "@/components/ui/page-intro"
 import { SectionShell } from "@/components/ui/section-shell"
-import { getServerSession } from "@/lib/services/server-session-service"
 import { listUserTravelHistory } from "@/lib/services/search-service"
+import { getServerSession } from "@/lib/services/server-session-service"
 import { getCurrentUser } from "@/lib/services/user-service"
 
 export default async function DashboardPage() {

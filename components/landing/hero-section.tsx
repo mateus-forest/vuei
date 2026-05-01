@@ -1,8 +1,8 @@
 import Image from "next/image"
-import { BrandBadge } from "@/components/ui/brand-badge"
-import { AiTripForm } from "@/components/trip/ai-trip-form"
-import { SectionShell } from "@/components/ui/section-shell"
 import { Sparkles } from "lucide-react"
+import { AiTripForm } from "@/components/trip/ai-trip-form"
+import { BrandBadge } from "@/components/ui/brand-badge"
+import { SectionShell } from "@/components/ui/section-shell"
 
 export function HeroSection() {
   return (
@@ -28,7 +28,7 @@ export function HeroSection() {
 
         <BrandBadge className="mb-6">
           <Sparkles className="size-4 text-[#5de0e6]" />
-          App web de descoberta e simulacao de viagens com IA
+          App web de descoberta e simulação de viagens com IA
         </BrandBadge>
 
         <h1 className="font-heading text-4xl font-bold leading-tight text-balance text-foreground sm:text-5xl lg:text-6xl">
@@ -36,7 +36,7 @@ export function HeroSection() {
           <span className="bg-[linear-gradient(90deg,#5de0e6,#004aad)] bg-clip-text text-transparent">em segundos</span>
         </h1>
         <p className="mx-auto mt-5 max-w-2xl text-lg text-muted-foreground sm:text-xl">
-          Clareza para decidir rapido. O VUEI sugere destinos, estima custos e resume o roteiro ideal para voce.
+          Clareza para decidir rápido. O VUEI sugere destinos, estima custos e resume o roteiro ideal para você.
         </p>
 
         <div className="mx-auto mt-7 max-w-4xl">
@@ -44,7 +44,7 @@ export function HeroSection() {
         </div>
 
         <p className="mt-10 text-sm text-muted-foreground">
-          Mais de <span className="font-semibold text-foreground">10.000 simulações</span> geradas com VUEI para decidir melhor.
+          Mais de <span className="font-semibold text-foreground">10.000 simulações</span> geradas com o VUEI para decidir melhor.
         </p>
       </div>
     </SectionShell>

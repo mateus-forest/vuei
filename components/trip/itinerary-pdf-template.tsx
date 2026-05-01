@@ -95,8 +95,8 @@ export function ItineraryPdfTemplate({
   }
 
   const safePeriod = periodLabel ?? "Per\u00edodo n\u00e3o informado"
-  const safePeriodReason = periodReason ?? "Periodo ainda nao definido para a viagem."
-  const safeDates = startDate && endDate ? `${startDate} a ${endDate}` : startDate ?? endDate ?? "Nao informado"
+  const safePeriodReason = periodReason ?? "Período ainda não definido para a viagem."
+  const safeDates = startDate && endDate ? `${startDate} a ${endDate}` : startDate ?? endDate ?? "Não informado"
   const safeDuration = durationLabel ?? `${durationDays} ${durationDays === 1 ? "dia" : "dias"}`
 
   const printStyles = {
@@ -337,7 +337,7 @@ export function ItineraryPdfTemplate({
               <div style={printStyles.metaValue}>{destination}</div>
             </div>
             <div style={printStyles.metaItem}>
-              <div style={printStyles.metaTitle}>{isSuggestedPeriod ? "Periodo recomendado" : "Periodo informado"}</div>
+              <div style={printStyles.metaTitle}>{isSuggestedPeriod ? "Período recomendado" : "Período informado"}</div>
               <div style={printStyles.metaValue}>{safePeriod}</div>
             </div>
             <div style={printStyles.metaItem}>
@@ -348,7 +348,7 @@ export function ItineraryPdfTemplate({
 
           <div style={printStyles.metaGrid}>
             <div style={printStyles.metaItem}>
-              <div style={printStyles.metaTitle}>Duracao</div>
+              <div style={printStyles.metaTitle}>Duração</div>
               <div style={printStyles.metaValue}>{safeDuration}</div>
             </div>
             <div style={printStyles.metaItem}>
@@ -356,7 +356,7 @@ export function ItineraryPdfTemplate({
               <div style={printStyles.metaValue}>{travelersLabel}</div>
             </div>
             <div style={printStyles.metaItem}>
-              <div style={printStyles.metaTitle}>Opcao</div>
+              <div style={printStyles.metaTitle}>Opção</div>
               <div style={printStyles.metaValue}>{selectedVariantLabel}</div>
             </div>
           </div>
@@ -449,7 +449,7 @@ export function ItineraryPdfTemplate({
         <section data-pdf-section="insights" style={printStyles.card}>
           <div style={printStyles.sectionTitleRow}>
             <span style={printStyles.sectionDot}>5</span>
-            <h2 style={printStyles.sectionTitle}>Insights da opcao escolhida</h2>
+            <h2 style={printStyles.sectionTitle}>Insights da opção escolhida</h2>
           </div>
           <ul style={printStyles.list}>
             {insights.map((item) => (
@@ -479,7 +479,7 @@ export function ItineraryPdfTemplate({
         <section data-pdf-section="attention-points" style={printStyles.card}>
           <div style={printStyles.sectionTitleRow}>
             <span style={printStyles.sectionDot}>7</span>
-            <h2 style={printStyles.sectionTitle}>Pontos de atencao</h2>
+            <h2 style={printStyles.sectionTitle}>Pontos de atenção</h2>
           </div>
           <ul style={printStyles.list}>
             {attentionPoints.map((item) => (
@@ -494,13 +494,13 @@ export function ItineraryPdfTemplate({
         <section data-pdf-section="final-notes" style={printStyles.card}>
           <div style={printStyles.sectionTitleRow}>
             <span style={printStyles.sectionDot}>8</span>
-            <h2 style={printStyles.sectionTitle}>Observacoes finais</h2>
+            <h2 style={printStyles.sectionTitle}>Observações finais</h2>
           </div>
           <p style={printStyles.paragraph}>
-            Este roteiro foi criado especialmente para voce com base nas suas preferencias. Aproveite cada momento dessa experiencia unica.
+            Este roteiro foi criado especialmente para você com base nas suas preferências. Aproveite cada momento dessa experiência única.
           </p>
           <p style={{ ...printStyles.paragraph, marginTop: "10px" }}>
-            Os valores sao estimativas e podem variar conforme disponibilidade, cambio, antecedencia e periodo.
+            Os valores são estimativas e podem variar conforme disponibilidade, câmbio, antecedência e período.
           </p>
         </section>
       </div>

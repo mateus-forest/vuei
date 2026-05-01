@@ -6,19 +6,19 @@ const steps = [
     icon: MessageSquare,
     number: "01",
     title: "Descreva a viagem",
-    description: "Conte o que voce quer viver, quanto pretende gastar e qual momento da viagem importa mais.",
+    description: "Conte o que você quer viver, quanto pretende gastar e qual momento da viagem importa mais.",
   },
   {
     icon: Sparkles,
     number: "02",
-    title: "Receba a simulacao",
+    title: "Receba a simulação",
     description: "O VUEI cruza contexto, perfil e praticidade para sugerir um destino com clareza imediata.",
   },
   {
     icon: Map,
     number: "03",
     title: "Decida e continue",
-    description: "Veja custo, melhor uso da viagem, roteiro resumido e acione ajustes, login ou nova busca.",
+    description: "Veja custos, o melhor uso da viagem, um roteiro resumido e siga com ajustes, login ou uma nova busca.",
   },
 ]
 
@@ -27,7 +27,7 @@ export function HowItWorksSection() {
     <SectionShell id="como-funciona" className="bg-secondary/35">
       <div className="mb-14 text-center">
         <h2 className="font-heading text-3xl font-bold text-foreground sm:text-4xl">Como funciona</h2>
-        <p className="mx-auto mt-4 max-w-2xl text-lg text-muted-foreground">Planejamento simples, rapido e com menos friccao para decidir.</p>
+        <p className="mx-auto mt-4 max-w-2xl text-lg text-muted-foreground">Planejamento simples, rápido e com menos fricção para decidir.</p>
       </div>
 
       <div className="grid gap-6 md:grid-cols-3">
