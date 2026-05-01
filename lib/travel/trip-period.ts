@@ -42,6 +42,32 @@ const MONTHS_PT = [
   "dezembro",
 ] as const
 
+export function getTripMonth(period: {
+  startDate?: string
+  periodLabel?: string
+  isSuggestedPeriod?: boolean
+}): number {
+  if (period.startDate) {
+    const normalized = normalizeText(period.startDate)
+    const monthIndex = MONTHS_PT.findIndex((month) => normalized.includes(month))
+    if (monthIndex >= 0) return monthIndex + 1
+
+    const isoMatch = normalized.match(/\d{4}-(\d{2})-\d{2}/)
+    if (isoMatch) return Math.max(1, Math.min(12, Number.parseInt(isoMatch[1], 10)))
+
+    const brMatch = normalized.match(/\d{2}\/(\d{2})\/\d{4}/)
+    if (brMatch) return Math.max(1, Math.min(12, Number.parseInt(brMatch[1], 10)))
+  }
+
+  if (period.periodLabel) {
+    const normalized = normalizeText(period.periodLabel)
+    const monthIndex = MONTHS_PT.findIndex((month) => normalized.includes(month))
+    if (monthIndex >= 0) return monthIndex + 1
+  }
+
+  return new Date().getMonth() + 1
+}
+
 function normalizeText(value: string | null | undefined) {
   return (value ?? "")
     .normalize("NFD")

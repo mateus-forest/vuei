@@ -13,6 +13,7 @@ export type TravelDestinationData = {
   region: string
   tags: string[]
   bestMonths?: number[]
+  seasonalityMultiplierByMonth?: Partial<Record<number, number>>
   highSeasonMonths: number[]
   lowSeasonMonths: number[]
   avgDailyCostBRL: number

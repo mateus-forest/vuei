@@ -7,7 +7,8 @@ import { CREDITS_PER_GENERATED_TRIP } from "@/lib/services/credit-service"
 import { getCurrentUser } from "@/lib/services/user-service"
 import { createSupabaseAdminClient } from "@/lib/supabase/server"
 import { buildTripIntelligence } from "@/lib/travel/travel-intelligence"
-import { resolveTripPeriod } from "@/lib/travel/trip-period"
+import { applySeasonalityMultiplier, getSeasonalityPriceMessage, scaleBreakdownToTotal } from "@/lib/travel/seasonality"
+import { getTripMonth, resolveTripPeriod } from "@/lib/travel/trip-period"
 import type { AppSession } from "@/types/session"
 import type {
   QuizAnswer,
@@ -78,6 +79,13 @@ type PeriodData = {
   durationLabel: string
   isSuggestedPeriod: boolean
   periodReason: string
+}
+
+type SeasonalVariantPricing = {
+  totalCost: number
+  breakdown: TripCostBreakdown
+  multiplier: number
+  message: string
 }
 
 function normalizeText(value: string | null | undefined) {
@@ -391,6 +399,21 @@ function buildBaseVariantCost({
   return clampTripCost(total)
 }
 
+function resolveSeasonalityContext(request: TripGenerationInput, destination: string) {
+  const intelligenceContext = buildTripIntelligence(destination, request)
+  const resolvedPeriod = resolveTripPeriod(request, intelligenceContext.destinationData, intelligenceContext.userProfile)
+  const month = getTripMonth({
+    startDate: resolvedPeriod.startDate,
+    periodLabel: resolvedPeriod.periodLabel,
+    isSuggestedPeriod: resolvedPeriod.isSuggestedPeriod,
+  })
+
+  return {
+    destinationData: intelligenceContext.destinationData,
+    month,
+  }
+}
+
 function buildBreakdown({
   totalCost,
   variantType,
@@ -502,6 +525,41 @@ function normalizeBreakdown({
   return normalized
 }
 
+function buildSeasonalVariantPricing({
+  breakdown,
+  totalCost,
+  variantType,
+  request,
+  destination,
+  durationDays,
+}: {
+  breakdown: Partial<TripCostBreakdown> | null | undefined
+  totalCost: number
+  variantType: CostVariantType
+  request: TripGenerationInput
+  destination: string
+  durationDays: number
+}): SeasonalVariantPricing {
+  const baseBreakdown = normalizeBreakdown({
+    breakdown,
+    totalCost,
+    variantType,
+    request,
+    destination,
+    durationDays,
+  })
+  const { destinationData, month } = resolveSeasonalityContext(request, destination)
+  const seasonalized = applySeasonalityMultiplier(baseBreakdown, month, destinationData)
+  const seasonalTotal = clampTripCost(seasonalized.totalCost)
+
+  return {
+    totalCost: seasonalTotal,
+    breakdown: scaleBreakdownToTotal(seasonalized.breakdown, seasonalTotal),
+    multiplier: seasonalized.multiplier,
+    message: getSeasonalityPriceMessage(seasonalized.multiplier),
+  }
+}
+
 function compactItineraryLine(value: string, index: number) {
   const sentence = normalizeText(value).split(".")[0] || normalizeText(value)
   return sentence.startsWith("Dia") ? sentence : `Dia ${index + 1}: ${sentence}`
@@ -570,26 +628,29 @@ function normalizeVariant({
   })
 
   const aiTotal = typeof variant?.totalCost === "number" ? clampTripCost(variant.totalCost) : null
-  const totalCost = aiTotal && aiTotal >= MIN_TRIP_COST && aiTotal <= MAX_TRIP_COST ? aiTotal : fallbackTotal
+  const seedTotal = aiTotal && aiTotal >= MIN_TRIP_COST && aiTotal <= MAX_TRIP_COST ? aiTotal : fallbackTotal
   const titleByType: Record<CostVariantType, string> = {
-    economic: "Econômico",
-    intermediate: "Intermediário",
+    economic: "Economico",
+    intermediate: "Intermediario",
     premium: "Premium",
   }
 
-  const breakdown = normalizeBreakdown({
+  const pricing = buildSeasonalVariantPricing({
     breakdown: variant?.breakdown,
-    totalCost,
+    totalCost: seedTotal,
     variantType: expectedType,
     request,
     destination,
     durationDays,
   })
 
+  const totalCost = pricing.totalCost
+  const breakdown = pricing.breakdown
   const costPerPerson = clampTripCost(totalCost / travelers)
-  const assumptions =
+  const assumptionsBase =
     normalizeText(variant?.assumptions) ||
     buildAssumptions({ destination, variantTitle: titleByType[expectedType], travelers, durationDays, request })
+  const assumptions = assumptionsBase.includes(pricing.message) ? assumptionsBase : `${assumptionsBase} ${pricing.message}`.trim()
   const itinerary = normalizeItinerary(variant?.itinerary ?? [], destination, titleByType[expectedType])
 
   return {
@@ -669,41 +730,37 @@ function ensureVariantOrdering({
       ...(premium ?? normalizeVariant({ variant: undefined, expectedType: "premium", request, destination, bestFor, travelers, durationDays })),
       totalCost: clampTripCost(premiumTotal),
     },
-  ].map((variant) => {
-    const breakdown = normalizeBreakdown({
-      breakdown: variant.breakdown,
-      totalCost: variant.totalCost,
-      variantType: variant.type,
-      request,
-      destination,
-      durationDays,
-    })
-
-    return {
-      ...variant,
-      breakdown,
-      costPerPerson: clampTripCost(variant.totalCost / travelers),
-    }
-  })
+  ].map((variant) => ({
+    ...variant,
+    breakdown: scaleBreakdownToTotal(variant.breakdown, variant.totalCost),
+    costPerPerson: clampTripCost(variant.totalCost / travelers),
+  }))
 }
 
 function normalizeEstimatedCost(rawCost: string, request: TripGenerationInput, bestFor: string) {
+  const destination = extractDestinationFromInput(request.inputText) ?? "Destino sugerido"
   const parsed = extractCostNumber(rawCost)
-  const finalCost =
-    parsed && parsed >= MIN_TRIP_COST && parsed <= MAX_TRIP_COST ? parsed : buildBaseVariantCost({
-      request,
-      destination: extractDestinationFromInput(request.inputText) ?? "Destino sugerido",
-      bestFor,
-      travelers: inferTravelers(request, bestFor),
-      durationDays: resolveDurationDays(request),
-      variantType: "intermediate",
-    })
+  const seedCost =
+    parsed && parsed >= MIN_TRIP_COST && parsed <= MAX_TRIP_COST
+      ? parsed
+      : buildBaseVariantCost({
+          request,
+          destination,
+          bestFor,
+          travelers: inferTravelers(request, bestFor),
+          durationDays: resolveDurationDays(request),
+          variantType: "intermediate",
+        })
+  const pricing = buildSeasonalVariantPricing({
+    breakdown: undefined,
+    totalCost: seedCost,
+    variantType: "intermediate",
+    request,
+    destination,
+    durationDays: resolveDurationDays(request),
+  })
 
-  console.log("COST RAW:", rawCost)
-  console.log("COST PARSED:", parsed)
-  console.log("COST FINAL:", finalCost)
-
-  return formatTripCost(finalCost)
+  return formatTripCost(pricing.totalCost)
 }
 
 function buildFallbackTripResult(origin: TripOrigin): TripResult {
@@ -723,10 +780,11 @@ function buildFallbackTripResult(origin: TripOrigin): TripResult {
 
 function normalizeTripResult(result: TripResult, request?: TripGenerationInput): TripResult {
   const bestFor = normalizeText(result.bestFor) || "viajantes em busca de praticidade"
-  const normalizedCost = request ? normalizeEstimatedCost(result.estimatedCost, request, bestFor) : result.estimatedCost
   const periodData = request ? resolveTripPeriodData(request, result.destination) : null
   const travelers = request ? inferTravelers(request, bestFor) : result.travelers ?? 2
   const intelligence = request ? buildTripIntelligence(result.destination, request).intelligence : result.intelligence
+  const selectedVariant = result.variants?.find((variant) => variant.type === "intermediate") ?? result.variants?.[0]
+  const normalizedCost = selectedVariant ? formatTripCost(selectedVariant.totalCost) : request ? normalizeEstimatedCost(result.estimatedCost, request, bestFor) : result.estimatedCost
 
   return {
     ...result,
@@ -1261,6 +1319,10 @@ export function generateTripFromQuiz(answers: QuizAnswer): TripResult {
     },
   )
 }
+
+
+
+
 
 
 

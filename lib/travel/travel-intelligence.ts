@@ -1,3 +1,7 @@
+import { applySeasonalityMultiplier, getSeasonalityMultiplier, getSeasonalityPriceMessage } from "@/lib/travel/seasonality"
+import { travelKnowledgeBase, travelRegionFallbacks, type TravelDestinationData } from "@/lib/travel/travelKnowledgeBase"
+import { getTripMonth, resolveTripPeriod } from "@/lib/travel/trip-period"
+import { defaultTripProfile, resolveTripProfileFallback, sanitizeTripProfileInput } from "@/lib/travel/trip-profile"
 import type {
   OvercrowdingInsight,
   OvercrowdingLabel,
@@ -8,8 +12,6 @@ import type {
   TripGenerationInput,
   TripIntelligence,
 } from "@/types/trip"
-import { travelKnowledgeBase, travelRegionFallbacks, type TravelDestinationData } from "@/lib/travel/travelKnowledgeBase"
-import { defaultTripProfile, resolveTripProfileFallback, sanitizeTripProfileInput } from "@/lib/travel/trip-profile"
 
 export type UserTravelProfile = {
   budgetLevel: "low" | "medium" | "high"
@@ -329,23 +331,30 @@ function estimateTripCost(destinationData: TravelDestinationData, userProfile: U
   const lodgingTier = selectLodgingTier(userProfile)
   const people = Math.max(1, userProfile.travelers)
   const flightKey = destinationData.region === "Brasil" ? "domesticOrigin" : "internationalOrigin"
-  const flightCost = destinationData.estimatedFlightCostBRL[flightKey] * people
-  const lodging = destinationData.lodgingDailyBRL[lodgingTier] * userProfile.durationDays
-  const food =
-    (userProfile.budgetLevel === "low"
-      ? destinationData.foodDailyBRL.economico
-      : userProfile.budgetLevel === "high"
-        ? destinationData.foodDailyBRL.premium
-        : destinationData.foodDailyBRL.intermediario) *
-    userProfile.durationDays *
-    people
-  const localTransport = destinationData.localTransportDailyBRL * userProfile.durationDays * people
+  const baseCosts = {
+    flights: destinationData.estimatedFlightCostBRL[flightKey] * people,
+    lodging: destinationData.lodgingDailyBRL[lodgingTier] * userProfile.durationDays,
+    food:
+      (userProfile.budgetLevel === "low"
+        ? destinationData.foodDailyBRL.economico
+        : userProfile.budgetLevel === "high"
+          ? destinationData.foodDailyBRL.premium
+          : destinationData.foodDailyBRL.intermediario) *
+      userProfile.durationDays *
+      people,
+    localTransport: destinationData.localTransportDailyBRL * userProfile.durationDays * people,
+    activities: 0,
+  }
+
+  const seasonalized = applySeasonalityMultiplier(baseCosts, userProfile.month ?? new Date().getMonth() + 1, destinationData)
+
   return {
-    total: flightCost + lodging + food + localTransport,
-    flightCost,
-    lodging,
-    food,
-    localTransport,
+    total: seasonalized.totalCost,
+    flightCost: seasonalized.breakdown.flights,
+    lodging: seasonalized.breakdown.lodging,
+    food: seasonalized.breakdown.food,
+    localTransport: seasonalized.breakdown.localTransport,
+    multiplier: seasonalized.multiplier,
   }
 }
 
@@ -513,40 +522,48 @@ export function generateTravelExplanation(
 ): TravelExplanation {
   const reasons: string[] = []
   const warnings: string[] = []
-  const monthLabel = userProfile.month ? MONTHS_PT[userProfile.month - 1] : "o período informado"
+  const monthLabel = userProfile.month ? MONTHS_PT[userProfile.month - 1] : "o perÃ­odo informado"
   const climate = userProfile.month ? destinationData.climateByMonth[userProfile.month] : undefined
+  const seasonalityMultiplier = userProfile.month ? getSeasonalityMultiplier(destinationData, userProfile.month) : 1
+  const seasonalityMessage = getSeasonalityPriceMessage(seasonalityMultiplier)
 
   reasons.push(
     `${destinationData.destination} combina com o perfil informado por equilibrar ${destinationData.tags.slice(0, 3).join(", ")}.`,
   )
 
   if (userProfile.prefersSnow && (climate?.snowProbability ?? 0) > 40) {
-    reasons.push(`${monthLabel.charAt(0).toUpperCase() + monthLabel.slice(1)} aumenta a chance de neve e reforça a experiência de inverno.`)
+    reasons.push(`${monthLabel.charAt(0).toUpperCase() + monthLabel.slice(1)} aumenta a chance de neve e reforÃ§a a experiÃªncia de inverno.`)
   } else if (userProfile.prefersBeach && climate) {
     reasons.push(
-      `${monthLabel.charAt(0).toUpperCase() + monthLabel.slice(1)} tende a entregar clima favorável para praia, com conforto estimado de ${scores.climateComfortScore}/100.`,
+      `${monthLabel.charAt(0).toUpperCase() + monthLabel.slice(1)} tende a entregar clima favorÃ¡vel para praia, com conforto estimado de ${scores.climateComfortScore}/100.`,
     )
   }
 
   if (scores.affordabilityScore >= 70) {
-    reasons.push("O custo estimado fica relativamente bem alinhado ao orçamento interpretado para a viagem.")
+    reasons.push("O custo estimado fica relativamente bem alinhado ao orÃ§amento interpretado para a viagem.")
   } else {
-    reasons.push("A experiência tende a ser boa, mas o orçamento precisa absorver custos de passagem, hospedagem e alimentação acima da média.")
+    reasons.push("A experiÃªncia tende a ser boa, mas o orÃ§amento precisa absorver custos de passagem, hospedagem e alimentaÃ§Ã£o acima da mÃ©dia.")
+  }
+
+  if (seasonalityMultiplier > 1.2) {
+    warnings.push(seasonalityMessage)
+  } else {
+    reasons.push(seasonalityMessage)
   }
 
   if (scores.overcrowdingIndex.label === "muito cheio") {
-    warnings.push(`${monthLabel.charAt(0).toUpperCase() + monthLabel.slice(1)} costuma ter maior lotação turística nesse destino.`)
+    warnings.push(`${monthLabel.charAt(0).toUpperCase() + monthLabel.slice(1)} costuma ter maior lotaÃ§Ã£o turÃ­stica nesse destino.`)
   }
 
   if (scores.climateComfortScore < 60) {
-    warnings.push("O clima estimado para o período pode reduzir o conforto da viagem.")
+    warnings.push("O clima estimado para o perÃ­odo pode reduzir o conforto da viagem.")
   }
 
   if (scores.smartTimingScore.score < 55) {
-    warnings.push("Os preços podem estar pressionados pelo período ou pela procura sazonal.")
+    warnings.push("Os preÃ§os podem estar pressionados pelo perÃ­odo ou pela procura sazonal.")
   }
 
-  warnings.push("Os valores são estimativas e podem variar conforme antecedência, câmbio e disponibilidade.")
+  warnings.push("Os valores sÃ£o estimativas e podem variar conforme antecedÃªncia, cÃ¢mbio e disponibilidade.")
 
   const strongestCandidates = [
     { label: "natureza", score: destinationData.natureScore },
@@ -557,17 +574,17 @@ export function generateTravelExplanation(
 
   const attentionCandidates = [
     { label: "custo", score: 100 - scores.affordabilityScore },
-    { label: "lotação", score: scores.overcrowdingIndex.score },
+    { label: "lotaÃ§Ã£o", score: scores.overcrowdingIndex.score },
     { label: "clima", score: 100 - scores.climateComfortScore },
     { label: "deslocamento", score: 100 - scores.routeComfortScore },
   ].sort((left, right) => right.score - left.score)
 
   return {
-    summary: `${destinationData.destination} combina ${scores.destinationMatchScore >= 75 ? "bem" : "de forma razoável"} com o perfil informado por unir ${destinationData.tags.slice(0, 3).join(", ")} e boa aderência ao estilo da viagem.`,
-    reasons: reasons.slice(0, 3),
-    warnings: warnings.slice(0, 3),
-    strongestPoint: `O principal ponto forte é ${strongestCandidates[0]?.label ?? "a experiência geral"} do destino.`,
-    attentionPoint: `O principal ponto de atenção é ${attentionCandidates[0]?.label ?? "a previsibilidade do custo"} neste cenário.`,
+    summary: `${destinationData.destination} combina ${scores.destinationMatchScore >= 75 ? "bem" : "de forma razoÃ¡vel"} com o perfil informado por unir ${destinationData.tags.slice(0, 3).join(", ")} e boa aderÃªncia ao estilo da viagem.`,
+    reasons: reasons.slice(0, 4),
+    warnings: warnings.slice(0, 4),
+    strongestPoint: `O principal ponto forte Ã© ${strongestCandidates[0]?.label ?? "a experiÃªncia geral"} do destino.`,
+    attentionPoint: `O principal ponto de atenÃ§Ã£o Ã© ${attentionCandidates[0]?.label ?? "a previsibilidade do custo"} neste cenÃ¡rio.`,
   }
 }
 
@@ -578,8 +595,19 @@ export function buildTripIntelligence(destination: string, request: TripGenerati
   usedFallback: boolean
 } {
   const knowledgeMatch = findDestinationKnowledge(destination, request)
-  const userProfile = buildUserTravelProfile(request, destination)
+  const rawUserProfile = buildUserTravelProfile(request, destination)
   const destinationData = knowledgeMatch.destinationData
+  const resolvedPeriod = resolveTripPeriod(request, destinationData, rawUserProfile)
+  const resolvedMonth = getTripMonth({
+    startDate: resolvedPeriod.startDate,
+    periodLabel: resolvedPeriod.periodLabel,
+    isSuggestedPeriod: resolvedPeriod.isSuggestedPeriod,
+  })
+  const userProfile: UserTravelProfile = {
+    ...rawUserProfile,
+    month: resolvedMonth,
+    durationDays: resolvedPeriod.durationDays || rawUserProfile.durationDays,
+  }
 
   const affordabilityScore = calculateAffordabilityScore(destinationData, userProfile)
   const climateComfortScore = calculateClimateComfortScore(destinationData, userProfile)
