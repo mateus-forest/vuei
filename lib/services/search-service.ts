@@ -99,6 +99,8 @@ export async function getTravelHistoryItem(searchId: string | null | undefined, 
 
   if (userId) {
     query = query.eq("user_id", userId)
+  } else {
+    query = query.is("user_id", null)
   }
 
   const { data, error } = await query.maybeSingle()

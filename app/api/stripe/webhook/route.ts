@@ -1,6 +1,7 @@
 import { randomUUID } from "crypto"
 import { NextResponse } from "next/server"
 import Stripe from "stripe"
+import { getStripePlanConfig } from "@/lib/services/billing-service"
 import { createSupabaseAdminClient } from "@/lib/supabase/server"
 import { assertStripeWebhookSecret, getStripeServerClient } from "@/lib/stripe/server"
 
@@ -50,14 +51,14 @@ export async function POST(request: Request) {
     return jsonError("Invalid Stripe signature.", 400)
   }
 
-  console.log("WEBHOOK EVENT TYPE:", event.type)
-
   if (event.type !== "checkout.session.completed") {
-    return jsonOk({ received: true, ignored: true })
+    return jsonOk({ received: true, ignored: true, eventType: event.type })
   }
 
   const session = event.data.object as Stripe.Checkout.Session
   const metadata = session.metadata ?? {}
+  const eventId = event.id
+  const eventMarker = `stripe_event:${eventId}`
   const stripeSessionId = session.id
   const stripePaymentIntent =
     typeof session.payment_intent === "string" ? session.payment_intent : session.payment_intent?.id ?? null
@@ -66,17 +67,42 @@ export async function POST(request: Request) {
   const email = metadata.email ?? session.customer_details?.email ?? session.customer_email ?? null
   const plan = metadata.plan ?? null
   const credits = Number(metadata.credits ?? 0)
-
-  console.log("WEBHOOK SESSION METADATA:", metadata)
-  console.log("WEBHOOK SESSION ID:", session.id)
-  console.log("WEBHOOK CUSTOMER EMAIL:", session.customer_details?.email ?? session.customer_email ?? null)
+  const planConfig = plan ? getStripePlanConfig(plan) : null
 
   if (!stripeSessionId) {
-    return jsonOk({ received: true, ignored: true })
+    return jsonOk({ received: true, ignored: true, reason: "missing_session_id" })
+  }
+
+  if (status !== "paid") {
+    return jsonOk({ received: true, ignored: true, reason: "payment_not_confirmed" })
+  }
+
+  if (!Number.isInteger(credits) || credits <= 0) {
+    return jsonOk({ received: true, ignored: true, reason: "invalid_credits" })
+  }
+
+  if (!planConfig || planConfig.credits !== credits) {
+    return jsonOk({ received: true, ignored: true, reason: "invalid_plan_metadata" })
   }
 
   const supabase = createSupabaseAdminClient()
-  let resolvedUserId = metadata.userId ?? null
+
+  const { data: existingEventTransaction, error: existingEventTransactionError } = await supabase
+    .from("credit_transactions")
+    .select("id")
+    .eq("description", eventMarker)
+    .maybeSingle()
+
+  if (existingEventTransactionError) {
+    logSupabaseError("STRIPE WEBHOOK EVENT LOOKUP ERROR:", existingEventTransactionError)
+    return jsonError("Failed to lookup processed webhook event.", 500)
+  }
+
+  if (existingEventTransaction) {
+    return jsonOk({ received: true, alreadyProcessed: true, eventId })
+  }
+
+  let resolvedUserId = metadata.user_id ?? metadata.userId ?? null
 
   if ((!resolvedUserId || resolvedUserId === "null") && email) {
     const { data: profileByEmail, error: profileByEmailError } = await supabase
@@ -91,6 +117,10 @@ export async function POST(request: Request) {
     }
 
     resolvedUserId = profileByEmail?.id ?? null
+  }
+
+  if (!resolvedUserId) {
+    return jsonError("Failed to resolve user profile for credit update.", 500)
   }
 
   const { data: existingPayment, error: existingPaymentError } = await supabase
@@ -144,26 +174,7 @@ export async function POST(request: Request) {
   }
 
   if (existingTransaction) {
-    return jsonOk({ received: true, alreadyProcessed: true })
-  }
-
-  if (!resolvedUserId && email) {
-    const { data: profileByEmail, error: retryProfileLookupError } = await supabase
-      .from("profiles")
-      .select("id,email,credits")
-      .eq("email", email)
-      .maybeSingle()
-
-    if (retryProfileLookupError) {
-      logSupabaseError("STRIPE WEBHOOK PROFILE RETRY LOOKUP ERROR:", retryProfileLookupError)
-      return jsonError("Failed to resolve user profile for credit update.", 500)
-    }
-
-    resolvedUserId = profileByEmail?.id ?? null
-  }
-
-  if (!resolvedUserId) {
-    return jsonError("Failed to resolve user profile for credit update.", 500)
+    return jsonOk({ received: true, alreadyProcessed: true, paymentId })
   }
 
   const { data: profile, error: profileLookupError } = await supabase
@@ -201,7 +212,7 @@ export async function POST(request: Request) {
     email,
     type: "purchase",
     credits,
-    description: `Compra de créditos (${plan ?? "plano desconhecido"})`,
+    description: eventMarker,
     payment_id: paymentId,
   })
 
@@ -210,5 +221,5 @@ export async function POST(request: Request) {
     return jsonError("Failed to persist credit transaction.", 500)
   }
 
-  return jsonOk({ received: true, processed: true, paymentId, userId: resolvedUserId })
+  return jsonOk({ received: true, processed: true, paymentId, userId: resolvedUserId, eventId })
 }

@@ -93,6 +93,7 @@ export async function POST(request: Request) {
       customer_email: user.email ?? undefined,
       metadata: {
         userId: user.id,
+        user_id: user.id,
         email: user.email ?? "",
         plan: plan.id,
         credits: String(plan.credits),

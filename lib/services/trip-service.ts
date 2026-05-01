@@ -1136,7 +1136,121 @@ export async function generateAndPersistTrip({
     const now = new Date().toISOString()
     const searchId = randomUUID()
     const inputOriginal = buildInputLabel(request)
-    const transactionDescription = `Consumo de crédito da viagem ${searchId}`
+    const transactionDescription = `trip_usage:${searchId}`
+    const { data: latestProfile, error: latestProfileError } = await supabase
+      .from("profiles")
+      .select("id,email,credits")
+      .eq("id", user.id)
+      .maybeSingle()
+
+    if (latestProfileError || !latestProfile) {
+      console.error("PROFILE LOOKUP BEFORE CREDIT DEBIT ERROR", {
+        message: latestProfileError?.message,
+        code: latestProfileError?.code,
+        details: latestProfileError?.details,
+        hint: latestProfileError?.hint,
+      })
+      return {
+        ok: false as const,
+        status: 500,
+        error: "PROFILE_LOOKUP_FAILED",
+        message: "Nao foi possivel validar seus creditos agora. Tente novamente.",
+      }
+    }
+
+    const availableCredits = typeof latestProfile.credits === "number" ? latestProfile.credits : 0
+
+    if (availableCredits <= 0) {
+      return {
+        ok: false as const,
+        status: 402,
+        error: "NO_CREDITS",
+        message: "Voce nao tem creditos disponiveis. Compre mais creditos para gerar uma nova viagem.",
+      }
+    }
+
+    const newCreditsBalance = availableCredits - CREDITS_PER_GENERATED_TRIP
+    let updatedProfileCredits: number | null = null
+
+    console.time("credit-update")
+    try {
+      const { data: updatedProfile, error: profileUpdateError } = await supabase
+        .from("profiles")
+        .update({
+          credits: newCreditsBalance,
+        })
+        .eq("id", user.id)
+        .eq("credits", availableCredits)
+        .gt("credits", 0)
+        .select("id,credits")
+        .maybeSingle()
+
+      if (profileUpdateError || !updatedProfile) {
+        console.error("CREDIT ATOMIC DEBIT ERROR", {
+          message: profileUpdateError?.message,
+          code: profileUpdateError?.code,
+          details: profileUpdateError?.details,
+          hint: profileUpdateError?.hint,
+        })
+
+        const { data: concurrentProfile } = await supabase
+          .from("profiles")
+          .select("credits")
+          .eq("id", user.id)
+          .maybeSingle()
+
+        const concurrentCredits = typeof concurrentProfile?.credits === "number" ? concurrentProfile.credits : 0
+
+        return {
+          ok: false as const,
+          status: concurrentCredits <= 0 ? 402 : 409,
+          error: concurrentCredits <= 0 ? "NO_CREDITS" : "CREDIT_CONFLICT",
+          message:
+            concurrentCredits <= 0
+              ? "Voce nao tem creditos disponiveis. Compre mais creditos para gerar uma nova viagem."
+              : "Seu saldo foi atualizado em outra solicitacao. Tente novamente.",
+        }
+      }
+
+      updatedProfileCredits = typeof updatedProfile.credits === "number" ? updatedProfile.credits : newCreditsBalance
+
+      const { error: transactionError } = await supabase.from("credit_transactions").insert({
+        id: randomUUID(),
+        user_id: user.id,
+        email: user.email,
+        type: "usage",
+        credits: -CREDITS_PER_GENERATED_TRIP,
+        description: transactionDescription,
+        payment_id: null,
+        created_at: now,
+      })
+
+      if (transactionError) {
+        console.error("CREDIT TRANSACTION ERROR", {
+          message: transactionError.message,
+          code: transactionError.code,
+          details: transactionError.details,
+          hint: transactionError.hint,
+        })
+
+        await supabase
+          .from("profiles")
+          .update({
+            credits: availableCredits,
+          })
+          .eq("id", user.id)
+          .eq("credits", updatedProfileCredits)
+
+        return {
+          ok: false as const,
+          status: 500,
+          error: "CREDIT_TRANSACTION_FAILED",
+          message: "Nao foi possivel registrar o consumo do credito. Tente novamente.",
+        }
+      }
+    } finally {
+      console.timeEnd("credit-update")
+    }
 
     console.time("save-trip")
     try {
@@ -1158,103 +1272,39 @@ export async function generateAndPersistTrip({
           details: searchInsertError?.details,
           hint: searchInsertError?.hint,
         })
+
+        if (updatedProfileCredits !== null) {
+          await supabase
+            .from("profiles")
+            .update({
+              credits: availableCredits,
+            })
+            .eq("id", user.id)
+            .eq("credits", updatedProfileCredits)
+        }
+
+        await supabase
+          .from("credit_transactions")
+          .delete()
+          .eq("user_id", user.id)
+          .eq("description", transactionDescription)
+
         return {
           ok: false as const,
           status: 500,
           error: "TRIP_SAVE_FAILED",
-          message: "Não foi possível salvar sua viagem. Tente novamente.",
+          message: "Nao foi possivel salvar sua viagem. Tente novamente.",
         }
       }
     } finally {
       console.timeEnd("save-trip")
     }
 
-    const { data: existingUsage, error: usageQueryError } = await supabase
-      .from("credit_transactions")
-      .select("id")
-      .eq("user_id", user.id)
-      .eq("type", "usage")
-      .eq("description", transactionDescription)
-      .maybeSingle()
-
-    if (usageQueryError) {
-      console.error("CREDIT TRANSACTION LOOKUP ERROR", {
-        message: usageQueryError.message,
-        code: usageQueryError.code,
-        details: usageQueryError.details,
-        hint: usageQueryError.hint,
-      })
-    }
-
-    const shouldConsumeCredit = !existingUsage
-    const newCreditsBalance = shouldConsumeCredit ? user.credits - CREDITS_PER_GENERATED_TRIP : user.credits
-
-    if (shouldConsumeCredit) {
-      console.log("PROFILE CREDITS RESULT", {
-        userId: user.id,
-        currentCredits: user.credits,
-        newCreditsBalance,
-      })
-
-      console.time("credit-update")
-      try {
-        const { data: updatedProfile, error: profileUpdateError } = await supabase
-          .from("profiles")
-          .update({
-            credits: newCreditsBalance,
-          })
-          .eq("id", user.id)
-          .select("id,credits")
-          .maybeSingle()
-
-        if (profileUpdateError || !updatedProfile) {
-          console.error("CREDIT RESERVE ERROR", {
-            message: profileUpdateError?.message,
-            code: profileUpdateError?.code,
-            details: profileUpdateError?.details,
-            hint: profileUpdateError?.hint,
-            updatedProfile,
-          })
-
-          await supabase.from("searches").delete().eq("id", searchId)
-
-          return {
-            ok: false as const,
-            status: 409,
-            error: "CREDIT_CONFLICT",
-            message: "Não foi possível reservar seu crédito agora. Tente novamente.",
-          }
-        }
-
-        const { error: transactionError } = await supabase.from("credit_transactions").insert({
-          id: randomUUID(),
-          user_id: user.id,
-          email: user.email,
-          type: "usage",
-          credits: -CREDITS_PER_GENERATED_TRIP,
-          description: transactionDescription,
-          payment_id: null,
-          created_at: now,
-        })
-
-        if (transactionError) {
-          console.error("CREDIT TRANSACTION ERROR", {
-            message: transactionError.message,
-            code: transactionError.code,
-            details: transactionError.details,
-            hint: transactionError.hint,
-          })
-        }
-      } finally {
-        console.timeEnd("credit-update")
-      }
-    }
-
     return {
       ok: true as const,
       status: 200,
       tripId: searchId,
-      remainingCredits: newCreditsBalance,
+      remainingCredits: updatedProfileCredits ?? newCreditsBalance,
       result,
       inputOriginal,
     }
@@ -1319,7 +1369,6 @@ export function generateTripFromQuiz(answers: QuizAnswer): TripResult {
     },
   )
 }
-
 
 
 
