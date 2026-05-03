@@ -136,7 +136,13 @@ export function AiTripForm({
   const [selectedSuggestion, setSelectedSuggestion] = useState("")
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [isPending, startTransition] = useTransition()
-  const [freeSearchBlocked, setFreeSearchBlocked] = useState(false)
+  const [freeSearchBlocked, setFreeSearchBlocked] = useState(() => {
+    if (!enforceFreeSearchLimit || typeof window === "undefined") {
+      return false
+    }
+
+    return window.localStorage.getItem(FREE_SEARCH_STORAGE_KEY) === "true"
+  })
   const router = useRouter()
 
   const trimmed = useMemo(() => query.trim(), [query])
@@ -145,8 +151,15 @@ export function AiTripForm({
   useEffect(() => {
     if (!enforceFreeSearchLimit || typeof window === "undefined") return
 
-    const used = window.localStorage.getItem(FREE_SEARCH_STORAGE_KEY) === "true"
-    setFreeSearchBlocked(used)
+    const syncFreeSearchStatus = () => {
+      setFreeSearchBlocked(window.localStorage.getItem(FREE_SEARCH_STORAGE_KEY) === "true")
+    }
+
+    window.addEventListener("storage", syncFreeSearchStatus)
+
+    return () => {
+      window.removeEventListener("storage", syncFreeSearchStatus)
+    }
   }, [enforceFreeSearchLimit])
 
   async function handleSubmit() {

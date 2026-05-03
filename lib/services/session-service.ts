@@ -3,6 +3,7 @@
 import type { AppSession } from "@/types/session"
 import type { AuthError, AuthOtpResponse, AuthResponse, AuthTokenResponsePassword } from "@supabase/supabase-js"
 import { getSupabaseBrowserClient } from "@/lib/supabase/client"
+import { getConfiguredAppUrl } from "@/lib/utils/app-url"
 
 type SignInResult = AuthTokenResponsePassword
 type SignUpResult = AuthResponse
@@ -49,7 +50,7 @@ function normalizeAuthError(error: AuthError | null) {
 }
 
 function getAppUrl() {
-  return process.env.NEXT_PUBLIC_APP_URL || window.location.origin || "http://localhost:3000"
+  return getConfiguredAppUrl(typeof window === "undefined" ? undefined : window.location.origin)
 }
 
 export async function signInWithPassword(email: string, password: string) {

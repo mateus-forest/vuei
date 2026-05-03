@@ -78,7 +78,7 @@ export function DashboardHeader({ user, searches = [] }: { user: DashboardUser; 
         return
       }
 
-      window.location.href = json.data.url
+      window.location.assign(json.data.url)
     } catch (error) {
       console.error("CHECKOUT ERROR", error)
       setCreditsError("Não foi possível iniciar o checkout agora.")

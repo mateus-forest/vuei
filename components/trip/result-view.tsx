@@ -186,59 +186,118 @@ function buildPeriodItinerary(result: TripResult, detailedItinerary: string[], v
 function buildTripVariants(result: TripResult, currentCost: number) {
   const safeBaseCost = Math.max(currentCost, 1800)
   const baseDetailedItinerary = buildDetailedItinerary(result)
-
-  const variants: Array<{ id: VariantId; title: string; total: number; insight: string }> = [
+  const variantLabels: Record<VariantId, string> = {
+    economico: "Econ??mico",
+    intermediario: "Intermedi??rio",
+    premium: "Premium",
+  }
+  const fallbackVariants: Array<{
+    id: VariantId
+    title: string
+    total: number
+    insight: string
+    itinerary: string[]
+    breakdown?: Array<{ label: string; value: number }>
+  }> = [
     {
       id: "economico",
-      title: "Econômico",
+      title: variantLabels.economico,
       total: roundCurrency(Math.max(safeBaseCost - 1200, 1200)),
       insight:
         "Prioriza o essencial da viagem com hospedagem mais enxuta, logistica simples e custo menor para comparar com clareza.",
+      itinerary: result.itinerary,
     },
     {
       id: "intermediario",
-      title: "Intermediário",
+      title: variantLabels.intermediario,
       total: roundCurrency(safeBaseCost),
       insight:
-        "Equilibra conforto, localização e experiências centrais sem elevar demais o investimento total da viagem.",
+        "Equilibra conforto, localizacao e experiencias centrais sem elevar demais o investimento total da viagem.",
+      itinerary: result.itinerary,
     },
     {
       id: "premium",
-      title: "Premium",
+      title: variantLabels.premium,
       total: roundCurrency(Math.min(safeBaseCost + 2200, 18000)),
       insight:
         "Aumenta conforto e conveniencia com hospedagem melhor localizada, deslocamentos mais fluidos e agenda mais completa.",
+      itinerary: result.itinerary,
     },
   ]
 
+  const backendVariants: Array<{
+    id: VariantId
+    source:
+      | NonNullable<TripResult["variants"]>[number]
+      | undefined
+  }> =
+    result.variants?.length === 3
+      ? [
+          { id: "economico", source: result.variants.find((variant) => variant.type === "economic") },
+          { id: "intermediario", source: result.variants.find((variant) => variant.type === "intermediate") },
+          { id: "premium", source: result.variants.find((variant) => variant.type === "premium") },
+        ]
+      : []
+
+  const completeBackendVariants = backendVariants.filter(
+    (
+      variant,
+    ): variant is {
+      id: VariantId
+      source: NonNullable<TripResult["variants"]>[number]
+    } => Boolean(variant.source),
+  )
+
+  const variants = completeBackendVariants.length === 3
+    ? completeBackendVariants.map((variant) => ({
+        id: variant.id,
+        title: variantLabels[variant.id],
+        total: variant.source.totalCost,
+        insight: variant.source.assumptions?.trim() || result.context,
+        itinerary: variant.source.itinerary,
+        breakdown: [
+          { label: "Passagens", value: variant.source.breakdown.flights },
+          { label: "Hospedagem", value: variant.source.breakdown.lodging },
+          { label: "Alimentacao", value: variant.source.breakdown.food },
+          { label: "Transporte", value: variant.source.breakdown.localTransport },
+          { label: "Passeios", value: variant.source.breakdown.activities },
+        ],
+      }))
+    : fallbackVariants
+
   return variants.map((variant): TripVariant => {
-    const periodItinerary = buildPeriodItinerary(result, baseDetailedItinerary, variant.id)
+    const resultForItinerary: TripResult = {
+      ...result,
+      itinerary: variant.itinerary,
+    }
+    const periodItinerary = buildPeriodItinerary(resultForItinerary, baseDetailedItinerary, variant.id)
     const tipsByVariant: Record<VariantId, string[]> = {
       economico: [
-        "Hospedagens econômicas em áreas bem conectadas ajudam a controlar o orçamento.",
+        "Hospedagens econ??micas em ??reas bem conectadas ajudam a controlar o orcamento.",
         "Concentrar passeios principais reduz deslocamentos e gastos extras.",
         "Viajar fora da alta temporada costuma melhorar bastante o custo-beneficio.",
       ],
       intermediario: [
-        "Um roteiro equilibrado combina boa localização, conforto e agenda sem correria.",
-        "Reservar com antecedência ajuda a manter o custo previsível.",
-        "Vale ajustar os dias centrais para encaixar experiências mais completas.",
+        "Um roteiro equilibrado combina boa localizacao, conforto e agenda sem correria.",
+        "Reservar com antecedencia ajuda a manter o custo previsivel.",
+        "Vale ajustar os dias centrais para encaixar experiencias mais completas.",
       ],
       premium: [
-        "Hospedagens centrais e deslocamentos mais confortáveis aumentam a fluidez da viagem.",
-        "Reservar experiências concorridas antes da viagem melhora a disponibilidade.",
-        "Um roteiro com pausas maiores deixa a experiência mais agradável e sofisticada.",
+        "Hospedagens centrais e deslocamentos mais confortaveis aumentam a fluidez da viagem.",
+        "Reservar experiencias concorridas antes da viagem melhora a disponibilidade.",
+        "Um roteiro com pausas maiores deixa a experiencia mais agradavel e sofisticada.",
       ],
     }
 
     const summaryByVariant: Record<VariantId, string> = {
-      economico: "Versão mais enxuta da viagem, priorizando boa experiência com orçamento controlado.",
-      intermediario: "Versão equilibrada da viagem, combinando conforto, praticidade e experiências centrais.",
-      premium: "Versão mais completa da viagem, com mais conforto, ritmo fluido e melhor conveniência.",
+      economico: "Vers??o mais enxuta da viagem, priorizando boa experi??ncia com orcamento controlado.",
+      intermediario: "Vers??o equilibrada da viagem, combinando conforto, praticidade e experiencias centrais.",
+      premium: "Vers??o mais completa da viagem, com mais conforto, ritmo fluido e melhor conveniencia.",
     }
 
     const resultForVariant: TripResult = {
       ...result,
+      itinerary: variant.itinerary,
       estimatedCost: formatPrice(variant.total),
       summary: summaryByVariant[variant.id],
       context: variant.insight,
@@ -250,7 +309,7 @@ function buildTripVariants(result: TripResult, currentCost: number) {
 
     return {
       ...variant,
-      breakdown: buildBreakdown(variant.total, variant.id),
+      breakdown: variant.breakdown ?? buildBreakdown(variant.total, variant.id),
       result: resultForVariant,
       periodItinerary,
     }

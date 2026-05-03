@@ -2,6 +2,8 @@
 
 Data da auditoria: 1 de maio de 2026
 
+Atualização complementar: 3 de maio de 2026
+
 ## Checklist verificado
 
 - [x] Geração de viagem autenticada valida sessão no backend.
@@ -17,6 +19,8 @@ Data da auditoria: 1 de maio de 2026
 - [x] Webhook ignora pagamentos não confirmados.
 - [x] Webhook tem proteção contra duplicidade por `eventId` e `paymentId`.
 - [x] Build de produção concluído sem erro de TypeScript.
+- [x] `npm run lint` configurado e executando.
+- [x] `npm audit` revisado novamente antes da produção.
 
 ## O que foi corrigido
 
@@ -51,6 +55,12 @@ Data da auditoria: 1 de maio de 2026
 
 - Adicionei `STRIPE_PRICE_ID` em `.env.example`, além das variáveis já usadas por pacote.
 
+### 5. Lint e dependências
+
+- Configurei ESLint compatível com a stack atual de Next.js.
+- O projeto agora possui configuração de lint funcional em `eslint.config.mjs`.
+- `npm audit` terminou sem vulnerabilidades no estado final validado.
+
 ## Riscos encontrados
 
 ### Alto
@@ -59,9 +69,8 @@ Data da auditoria: 1 de maio de 2026
 
 ### Médio
 
-- O script `npm run lint` existe, mas o projeto não possui `eslint` instalado/configurado no ambiente atual.
-- `npm install` reportou `2 vulnerabilities` em dependências de terceiros (`1 moderate`, `1 high`), sem correção aplicada nesta auditoria.
 - Buscas anônimas continuam acessíveis por `tripId` na rota pública de resultado. Isso não expõe dados privados autenticados, mas mantém o comportamento de compartilhamento por ID. Se isso não for desejado em produção, o ideal é trocar por token assinado/expiração.
+- `npm run lint` ainda retorna `1 warning` não crítico sobre uso de `<img>` no template de PDF em `components/trip/itinerary-pdf-template.tsx`. Não bloqueia build nem execução.
 
 ## Configuração manual antes do deploy
 
@@ -97,10 +106,13 @@ Data da auditoria: 1 de maio de 2026
   - `credit_transactions`
   - `searches`
 - Validar se existe unicidade suficiente para `payments.stripe_session_id`.
+- Configurar no Supabase Dashboard:
+  - `Site URL` com o domínio real da aplicação
+  - `Redirect URLs` com o domínio real da aplicação
+  - remover `localhost` do ambiente de produção, se estiver cadastrado
 
 ## Recomendações finais
 
-- Instalar e configurar `eslint` de forma oficial antes do go-live para que `npm run lint` vire uma validação real.
 - Rodar teste manual completo em ambiente staging com Stripe real:
   1. login
   2. compra de créditos
@@ -111,10 +123,11 @@ Data da auditoria: 1 de maio de 2026
   7. histórico
   8. download
   9. logout/login
-- Rodar `npm audit` e avaliar atualização segura das dependências vulneráveis.
+- Personalizar os templates de e-mail do Supabase conforme [SUPABASE_EMAIL_TEMPLATES.md](/c:/Users/mateu/Downloads/vuei/SUPABASE_EMAIL_TEMPLATES.md).
 
 ## Evidências desta auditoria
 
 - `npm install`: executado
 - `npm run build`: concluído com sucesso
-- `npm run lint`: falhou porque `eslint` não está instalado no projeto
+- `npm run lint`: concluído com sucesso, com `1 warning` não crítico
+- `npm audit`: concluído sem vulnerabilidades

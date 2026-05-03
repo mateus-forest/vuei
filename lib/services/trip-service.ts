@@ -664,6 +664,37 @@ function normalizeVariant({
   }
 }
 
+function repriceVariant({
+  variant,
+  totalCost,
+  travelers,
+  request,
+  destination,
+  durationDays,
+}: {
+  variant: TripVariant
+  totalCost: number
+  travelers: number
+  request: TripGenerationInput
+  destination: string
+  durationDays: number
+}) {
+  const normalizedTotal = clampTripCost(totalCost)
+
+  return {
+    ...variant,
+    totalCost: normalizedTotal,
+    costPerPerson: clampTripCost(normalizedTotal / travelers),
+    breakdown: buildBreakdown({
+      totalCost: normalizedTotal,
+      variantType: variant.type,
+      request,
+      destination,
+      durationDays,
+    }),
+  }
+}
+
 function ensureVariantOrdering({
   variants,
   request,
@@ -709,32 +740,52 @@ function ensureVariantOrdering({
   })
 
   const minStep = Math.max(300, roundCurrency(durationDays * travelers * 80))
+  const orderedVariants = [
+    economic ?? normalizeVariant({ variant: undefined, expectedType: "economic", request, destination, bestFor, travelers, durationDays }),
+    intermediate ??
+      normalizeVariant({ variant: undefined, expectedType: "intermediate", request, destination, bestFor, travelers, durationDays }),
+    premium ?? normalizeVariant({ variant: undefined, expectedType: "premium", request, destination, bestFor, travelers, durationDays }),
+  ]
 
-  const economicTotal = economic ? Math.min(economic.totalCost, fallbackIntermediate - minStep) : fallbackEconomic
-  const intermediateSeed = intermediate?.totalCost ?? fallbackIntermediate
-  const intermediateTotal = Math.max(intermediateSeed, economicTotal + minStep)
-  const premiumSeed = premium?.totalCost ?? fallbackPremium
-  const premiumTotal = Math.max(premiumSeed, intermediateTotal + minStep)
+  const economicSeed = clampTripCost(Math.min(orderedVariants[0].totalCost, fallbackIntermediate - minStep))
+  const intermediateSeed = clampTripCost(orderedVariants[1].totalCost)
+  const premiumSeed = clampTripCost(orderedVariants[2].totalCost)
+  const hasInconsistentTotals = !(economicSeed < intermediateSeed && intermediateSeed < premiumSeed)
+
+  const economicTotal = hasInconsistentTotals ? clampTripCost(Math.min(economicSeed, fallbackEconomic)) : economicSeed
+  const intermediateTotal = hasInconsistentTotals
+    ? clampTripCost(Math.max(roundCurrency(economicTotal * 1.35), economicTotal + minStep))
+    : clampTripCost(Math.max(intermediateSeed, economicTotal + minStep))
+  const premiumTotal = hasInconsistentTotals
+    ? clampTripCost(Math.max(roundCurrency(intermediateTotal * 1.45), intermediateTotal + minStep))
+    : clampTripCost(Math.max(premiumSeed, intermediateTotal + minStep))
 
   return [
-    {
-      ...(economic ?? normalizeVariant({ variant: undefined, expectedType: "economic", request, destination, bestFor, travelers, durationDays })),
-      totalCost: clampTripCost(economicTotal),
-    },
-    {
-      ...(intermediate ??
-        normalizeVariant({ variant: undefined, expectedType: "intermediate", request, destination, bestFor, travelers, durationDays })),
-      totalCost: clampTripCost(intermediateTotal),
-    },
-    {
-      ...(premium ?? normalizeVariant({ variant: undefined, expectedType: "premium", request, destination, bestFor, travelers, durationDays })),
-      totalCost: clampTripCost(premiumTotal),
-    },
-  ].map((variant) => ({
-    ...variant,
-    breakdown: scaleBreakdownToTotal(variant.breakdown, variant.totalCost),
-    costPerPerson: clampTripCost(variant.totalCost / travelers),
-  }))
+    repriceVariant({
+      variant: orderedVariants[0],
+      totalCost: economicTotal,
+      travelers,
+      request,
+      destination,
+      durationDays,
+    }),
+    repriceVariant({
+      variant: orderedVariants[1],
+      totalCost: intermediateTotal,
+      travelers,
+      request,
+      destination,
+      durationDays,
+    }),
+    repriceVariant({
+      variant: orderedVariants[2],
+      totalCost: premiumTotal,
+      travelers,
+      request,
+      destination,
+      durationDays,
+    }),
+  ]
 }
 
 function normalizeEstimatedCost(rawCost: string, request: TripGenerationInput, bestFor: string) {
@@ -1369,7 +1420,6 @@ export function generateTripFromQuiz(answers: QuizAnswer): TripResult {
     },
   )
 }
-
 
 
 

@@ -1,4 +1,5 @@
 import { creditPackages } from "@/lib/constants/credit-packages"
+import { getConfiguredAppUrl } from "@/lib/utils/app-url"
 
 type StripePlanId = "pack-5" | "pack-15" | "pack-30"
 
@@ -57,15 +58,5 @@ export function getStripePlanConfig(planId: string) {
 }
 
 export function getAppBaseUrl() {
-  const configuredUrl = process.env.NEXT_PUBLIC_APP_URL?.trim()
-
-  if (configuredUrl) {
-    return configuredUrl.replace(/\/+$/, "")
-  }
-
-  if (process.env.NODE_ENV === "production") {
-    return ""
-  }
-
-  return "http://localhost:3000"
+  return getConfiguredAppUrl()
 }
