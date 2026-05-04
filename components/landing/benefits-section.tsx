@@ -13,11 +13,11 @@ export function BenefitsSection() {
     <SectionShell id="beneficios">
       <div className="mb-14 text-center">
         <h2 className="font-heading text-3xl font-bold text-foreground sm:text-4xl">
-          Tudo que você precisa para{" "}
+          Tudo o que você precisa para{" "}
           <span className="bg-[linear-gradient(90deg,#5de0e6,#004aad)] bg-clip-text text-transparent">planejar melhor</span>
         </h2>
         <p className="mx-auto mt-4 max-w-2xl text-lg text-muted-foreground">
-          A home continua simples, mas agora serve como base real para um produto completo.
+          Uma experiência simples, clara e pronta para evoluir com você.
         </p>
       </div>
       <div className="grid gap-6 sm:grid-cols-2 xl:grid-cols-4">

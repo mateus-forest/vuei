@@ -1,4 +1,4 @@
-"use client"
+﻿"use client"
 
 import { useState } from "react"
 import Image from "next/image"
@@ -396,7 +396,7 @@ export function DashboardHeader({ user, searches = [] }: { user: DashboardUser; 
             <DialogHeader>
               <DialogTitle className="font-heading text-2xl text-foreground">Editar perfil</DialogTitle>
               <DialogDescription className="text-muted-foreground">
-                Atualize seus dados de forma local no dashboard.
+                Atualize seus dados no dashboard.
               </DialogDescription>
             </DialogHeader>
 
@@ -410,7 +410,7 @@ export function DashboardHeader({ user, searches = [] }: { user: DashboardUser; 
                 />
               </label>
               <label className="block">
-                <span className="mb-2 block text-sm font-medium text-foreground">Email</span>
+                <span className="mb-2 block text-sm font-medium text-foreground">E-mail</span>
                 <input
                   value={profileForm.email}
                   onChange={(event) => setProfileForm((current) => ({ ...current, email: event.target.value }))}
@@ -445,7 +445,7 @@ export function DashboardHeader({ user, searches = [] }: { user: DashboardUser; 
             <DialogHeader>
               <DialogTitle className="font-heading text-2xl text-foreground">Alterar senha</DialogTitle>
               <DialogDescription className="text-muted-foreground">
-                Atualize sua senha de forma mockada dentro do dashboard.
+                Atualize sua senha no dashboard.
               </DialogDescription>
             </DialogHeader>
 
@@ -501,3 +501,5 @@ export function DashboardHeader({ user, searches = [] }: { user: DashboardUser; 
     </>
   )
 }
+
+

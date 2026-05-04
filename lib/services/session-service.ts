@@ -28,14 +28,14 @@ function normalizeAuthError(error: AuthError | null) {
   if (normalizedMessage.includes("email not confirmed") || normalizedMessage.includes("email_not_confirmed")) {
     return {
       ...error,
-      message: "Confirme seu email antes de entrar.",
+      message: "Confirme seu e-mail antes de entrar.",
     } as AuthError
   }
 
   if (normalizedMessage.includes("invalid login credentials")) {
     return {
       ...error,
-      message: "Email ou senha inválidos.",
+      message: "E-mail ou senha inválidos.",
     } as AuthError
   }
 

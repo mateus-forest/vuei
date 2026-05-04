@@ -180,7 +180,7 @@ export function QuizForm({ redirectTo = "/resultado" }: { redirectTo?: string })
           onSelect={(value) => updateAnswer("duration", value)}
         />
         <QuizRow
-          label="Destino"
+          label="Região da viagem"
           values={options.region}
           selected={answers.region}
           onSelect={(value) => updateAnswer("region", value)}

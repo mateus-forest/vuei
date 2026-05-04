@@ -203,7 +203,7 @@ export function AuthForm({ mode }: { mode: "login" | "signup" }) {
                 value={form.email}
                 onChange={(event) => setForm((current) => ({ ...current, email: event.target.value }))}
                 className="h-12 w-full rounded-2xl border border-border/60 bg-secondary/35 pl-11 pr-4 text-sm outline-none transition focus:border-[#5de0e6]/70"
-                placeholder="voce@email.com"
+                placeholder="você@email.com"
                 type="email"
               />
             </div>
@@ -238,7 +238,7 @@ export function AuthForm({ mode }: { mode: "login" | "signup" }) {
           ) : null}
 
           <GradientButton size="lg" className="mt-2 w-full" onClick={() => void handlePrimaryAction()} disabled={isSubmitting}>
-            {isSubmitting ? "Processando..." : isLogin ? "Entrar e continuar" : "Criar conta e entrar"}
+            {isSubmitting ? "Processando..." : isLogin ? "Entrar e continuar" : "Criar conta"}
             <ArrowRight className="size-5" />
           </GradientButton>
 
@@ -280,7 +280,7 @@ export function AuthForm({ mode }: { mode: "login" | "signup" }) {
                     value={recoveryEmail}
                     onChange={(event) => setRecoveryEmail(event.target.value)}
                     className="h-12 w-full rounded-2xl border border-border/60 bg-secondary/35 pl-11 pr-4 text-sm outline-none transition focus:border-[#5de0e6]/70"
-                    placeholder="voce@email.com"
+                    placeholder="você@email.com"
                     type="email"
                   />
                 </div>

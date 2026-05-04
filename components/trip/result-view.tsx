@@ -1,4 +1,4 @@
-"use client"
+﻿"use client"
 
 import Link from "next/link"
 import { type ReactNode, useMemo, useRef, useState } from "react"
@@ -82,7 +82,7 @@ function buildDetailedItinerary(result: TripResult) {
   if (result.detailedItinerary?.length) {
     return result.detailedItinerary.map(
       (day) =>
-        `${day.title}. Manha: ${day.morning} Tarde: ${day.afternoon} Noite: ${day.evening}${day.tips.length ? ` Dicas: ${day.tips.join("; ")}` : ""}`,
+        `${day.title}. Manhã: ${day.morning} Tarde: ${day.afternoon} Noite: ${day.evening}${day.tips.length ? ` Dicas: ${day.tips.join("; ")}` : ""}`,
     )
   }
 
@@ -149,7 +149,7 @@ function buildBreakdown(total: number, tier: VariantId) {
         ? [0.28, 0.36, 0.14, 0.08, 0.14]
         : [0.3, 0.32, 0.15, 0.09, 0.14]
 
-  const labels = ["Passagens", "Hospedagem", "Alimentacao", "Transporte", "Passeios"]
+  const labels = ["Passagens", "Hospedagem", "Alimentação", "Transporte", "Passeios"]
   const values = ratios.map((ratio) => roundCurrency(total * ratio))
   const adjustment = total - values.reduce((sum, value) => sum + value, 0)
   values[1] += adjustment
@@ -173,9 +173,9 @@ function buildPeriodItinerary(result: TripResult, detailedItinerary: string[], v
 
   const momentsByVariant: Record<VariantId, { morning: string; afternoon: string; night: string }> = {
     economico: {
-      morning: `Comece o dia em ${result.destination} com deslocamentos praticos e agenda objetiva.`,
-      afternoon: "Priorize o passeio central do destino com logistica simplificada e boas paradas.",
-      night: "Finalize com jantar em area acessivel e ritmo mais enxuto para controlar custos.",
+      morning: `Comece o dia em ${result.destination} com deslocamentos práticos e agenda objetiva.`,
+      afternoon: "Priorize o passeio central do destino com logística simplificada e boas paradas.",
+      night: "Finalize com jantar em área acessível e ritmo mais enxuto para controlar custos.",
     },
     intermediario: {
       morning: `Inicie o dia em ${result.destination} com agenda equilibrada e tempo para explorar com calma.`,
@@ -184,7 +184,7 @@ function buildPeriodItinerary(result: TripResult, detailedItinerary: string[], v
     },
     premium: {
       morning: `Comece o dia em ${result.destination} com mais conforto, deslocamentos suaves e experiência bem organizada.`,
-      afternoon: "Aprofunde os passeios principais com mais conveniencia, tempo de pausa e agenda fluida.",
+      afternoon: "Aprofunde os passeios principais com mais conveniência, tempo de pausa e agenda fluida.",
       night: "Encerramento com jantar especial, caminhada agradável ou experiência noturna mais refinada.",
     },
   }
@@ -207,8 +207,8 @@ function buildTripVariants(result: TripResult, currentCost: number) {
   const safeBaseCost = Math.max(currentCost, 1800)
   const baseDetailedItinerary = buildDetailedItinerary(result)
   const variantLabels: Record<VariantId, string> = {
-    economico: "Econ??mico",
-    intermediario: "Intermedi??rio",
+    economico: "Econômico",
+    intermediario: "Intermediário",
     premium: "Premium",
   }
   const fallbackVariants: Array<{
@@ -225,7 +225,7 @@ function buildTripVariants(result: TripResult, currentCost: number) {
       title: variantLabels.economico,
       total: roundCurrency(Math.max(safeBaseCost - 1200, 1200)),
       insight:
-        "Prioriza o essencial da viagem com hospedagem mais enxuta, logistica simples e custo menor para comparar com clareza.",
+        "Prioriza o essencial da viagem com hospedagem mais enxuta, logística simples e custo menor para comparar com clareza.",
       itinerary: result.itinerary,
       detailedItinerary: result.detailedItinerary,
     },
@@ -234,7 +234,7 @@ function buildTripVariants(result: TripResult, currentCost: number) {
       title: variantLabels.intermediario,
       total: roundCurrency(safeBaseCost),
       insight:
-        "Equilibra conforto, localizacao e experiencias centrais sem elevar demais o investimento total da viagem.",
+        "Equilibra conforto, localização e experiências centrais sem elevar demais o investimento total da viagem.",
       itinerary: result.itinerary,
       detailedItinerary: result.detailedItinerary,
     },
@@ -243,7 +243,7 @@ function buildTripVariants(result: TripResult, currentCost: number) {
       title: variantLabels.premium,
       total: roundCurrency(Math.min(safeBaseCost + 2200, 18000)),
       insight:
-        "Aumenta conforto e conveniencia com hospedagem melhor localizada, deslocamentos mais fluidos e agenda mais completa.",
+        "Aumenta conforto e conveniência com hospedagem melhor localizada, deslocamentos mais fluidos e agenda mais completa.",
       itinerary: result.itinerary,
       detailedItinerary: result.detailedItinerary,
     },
@@ -283,7 +283,7 @@ function buildTripVariants(result: TripResult, currentCost: number) {
         breakdown: [
           { label: "Passagens", value: variant.source.breakdown.flights },
           { label: "Hospedagem", value: variant.source.breakdown.lodging },
-          { label: "Alimentacao", value: variant.source.breakdown.food },
+          { label: "Alimentação", value: variant.source.breakdown.food },
           { label: "Transporte", value: variant.source.breakdown.localTransport },
           { label: "Passeios", value: variant.source.breakdown.activities },
         ],
@@ -299,26 +299,26 @@ function buildTripVariants(result: TripResult, currentCost: number) {
     const periodItinerary = buildPeriodItinerary(resultForItinerary, baseDetailedItinerary, variant.id)
     const tipsByVariant: Record<VariantId, string[]> = {
       economico: [
-        "Hospedagens econ??micas em ??reas bem conectadas ajudam a controlar o orcamento.",
+        "Hospedagens econômicas em áreas bem conectadas ajudam a controlar o orçamento.",
         "Concentrar passeios principais reduz deslocamentos e gastos extras.",
-        "Viajar fora da alta temporada costuma melhorar bastante o custo-beneficio.",
+        "Viajar fora da alta temporada costuma melhorar bastante o custo-benefício.",
       ],
       intermediario: [
-        "Um roteiro equilibrado combina boa localizacao, conforto e agenda sem correria.",
-        "Reservar com antecedencia ajuda a manter o custo previsivel.",
-        "Vale ajustar os dias centrais para encaixar experiencias mais completas.",
+        "Um roteiro equilibrado combina boa localização, conforto e agenda sem correria.",
+        "Reservar com antecedência ajuda a manter o custo previsível.",
+        "Vale ajustar os dias centrais para encaixar experiências mais completas.",
       ],
       premium: [
-        "Hospedagens centrais e deslocamentos mais confortaveis aumentam a fluidez da viagem.",
-        "Reservar experiencias concorridas antes da viagem melhora a disponibilidade.",
+        "Hospedagens centrais e deslocamentos mais confortáveis aumentam a fluidez da viagem.",
+        "Reservar experiências concorridas antes da viagem melhora a disponibilidade.",
         "Um roteiro com pausas maiores deixa a experiencia mais agradavel e sofisticada.",
       ],
     }
 
     const summaryByVariant: Record<VariantId, string> = {
-      economico: "Vers??o mais enxuta da viagem, priorizando boa experi??ncia com orcamento controlado.",
-      intermediario: "Vers??o equilibrada da viagem, combinando conforto, praticidade e experiencias centrais.",
-      premium: "Vers??o mais completa da viagem, com mais conforto, ritmo fluido e melhor conveniencia.",
+      economico: "Versão mais enxuta da viagem, priorizando boa experiência com orçamento controlado.",
+      intermediario: "Versão equilibrada da viagem, combinando conforto, praticidade e experiências centrais.",
+      premium: "Versão mais completa da viagem, com mais conforto, ritmo fluido e melhor conveniência.",
     }
 
     const resultForVariant: TripResult = {
@@ -331,7 +331,7 @@ function buildTripVariants(result: TripResult, currentCost: number) {
       tips: tipsByVariant[variant.id],
       fullItinerary: periodItinerary.map(
         (day) =>
-          `${day.title}. Manha: ${day.morning} Tarde: ${day.afternoon} Noite: ${day.evening}${day.tips.length ? ` Dicas: ${day.tips.join("; ")}` : ""}`,
+          `${day.title}. Manhã: ${day.morning} Tarde: ${day.afternoon} Noite: ${day.evening}${day.tips.length ? ` Dicas: ${day.tips.join("; ")}` : ""}`,
       ),
     }
 
@@ -454,7 +454,7 @@ function buildCompleteTripSummary({
     variant.periodItinerary.length > 0
       ? variant.periodItinerary.map((day, index) => ({
           title: day.title || `Dia ${index + 1}`,
-          description: [`Manha: ${day.morning}`, `Tarde: ${day.afternoon}`, `Noite: ${day.evening}`].join(" "),
+          description: [`Manhã: ${day.morning}`, `Tarde: ${day.afternoon}`, `Noite: ${day.evening}`].join(" "),
           tips: day.tips,
         }))
       : (result.fullItinerary ?? buildDetailedItinerary(result)).filter(Boolean).map((day, index) => ({
@@ -693,7 +693,7 @@ export function ResultView({
   const intelligenceWarnings = (intelligence?.explanation?.warnings ?? []).filter(Boolean)
   const summaryText = activeResult.summary?.trim() || "Encontramos uma sugestão pronta para comparar melhor custo, ritmo e conforto."
   const contextText = activeResult.context?.trim() || "A opção escolhida equilibra custo, experiência e praticidade para a viagem."
-  const bestForText = activeResult.bestFor?.trim() || "viagem flexivel"
+  const bestForText = activeResult.bestFor?.trim() || "viagem flexível"
   const completeTripSummary = useMemo(
     () =>
       buildCompleteTripSummary({
@@ -711,14 +711,14 @@ export function ResultView({
   const cheaperOption = {
     destination: activeResult.cheapestAlternative ?? `${activeResult.destination} Essencial`,
     estimatedCost: formatPrice(Math.max(activeCost - 900, 1800)),
-    reason: "Mantem a proposta principal da viagem, com custo menor, hospedagem mais enxuta e deslocamentos simplificados.",
+    reason: "Mantém a proposta principal da viagem, com custo menor, hospedagem mais enxuta e deslocamentos simplificados.",
   }
 
   const alternatives = [
     {
       destination: activeResult.cheapestAlternative ?? "Porto",
       estimatedCost: formatPrice(Math.max(activeCost - 700, 1900)),
-      reason: "Alternativa com melhor custo-beneficio e logistica simples.",
+      reason: "Alternativa com melhor custo-benefício e logística simples.",
     },
     {
       destination: `${activeResult.destination} Panorama`,
@@ -728,7 +728,7 @@ export function ResultView({
     {
       destination: `${activeResult.destination} Compacto`,
       estimatedCost: formatPrice(Math.max(activeCost - 400, 2000)),
-      reason: "Opcao enxuta para manter a viagem viavel sem se distanciar da proposta inicial.",
+      reason: "Opção enxuta para manter a viagem viável sem se distanciar da proposta inicial.",
     },
   ]
 
@@ -832,7 +832,7 @@ export function ResultView({
 
               <div className="grid w-full gap-3 sm:grid-cols-2 lg:max-w-[360px]">
                 <SummaryStat label="Custo estimado principal" value={activeResult.estimatedCost || "R$ 0"} />
-                <SummaryStat label="Versao selecionada" value={getSelectedVariantLabel(selectedVariant)} />
+                <SummaryStat label="Versão selecionada" value={getSelectedVariantLabel(selectedVariant)} />
               </div>
             </div>
 
@@ -853,17 +853,17 @@ export function ResultView({
           <BrandCard className="p-5 sm:p-6">
             <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
               <div>
-                <h3 className="text-xl font-semibold text-foreground">Compare as opcoes da viagem</h3>
+                <h3 className="text-xl font-semibold text-foreground">Compare as opções da viagem</h3>
                 <p className="mt-1 text-sm leading-6 text-muted-foreground">
                   Econômico, intermediário e premium organizados para comparar total, valor por pessoa e proposta da experiência.
                 </p>
               </div>
               <div className="text-sm text-muted-foreground">
                 {selectedVariant === "economico"
-                  ? "Menor custo entre as opcoes"
+                  ? "Menor custo entre as opções"
                   : selectedVariant === "premium"
                     ? "Maior conforto e investimento"
-                    : "Melhor equilibrio entre conforto e custo"}
+                    : "Melhor equilíbrio entre conforto e custo"}
               </div>
             </div>
 
@@ -883,7 +883,7 @@ export function ResultView({
           <Accordion type="multiple" className="space-y-4">
             <ExpandableSection value="summary-itinerary" title="Ver roteiro resumido">
               <div className="space-y-3 text-sm leading-6 text-muted-foreground">
-                {(activeResult.itinerary.filter(Boolean).length > 0 ? activeResult.itinerary.filter(Boolean) : ["Roteiro resumido indisponivel no momento."]).map(
+                {(activeResult.itinerary.filter(Boolean).length > 0 ? activeResult.itinerary.filter(Boolean) : ["Roteiro resumido indisponível no momento."]).map(
                   (day) => (
                     <div key={day} className="rounded-2xl bg-secondary/35 px-4 py-3">
                       {day}
@@ -976,7 +976,7 @@ export function ResultView({
                       label={getScoreLabel("climate", intelligence.climateComfortScore)}
                     />
                     <IntelligenceMetricCard
-                      title="Lotacao"
+                      title="Lotação"
                       score={intelligence.overcrowdingIndex?.score}
                       label={getScoreLabel("crowd", intelligence.overcrowdingIndex?.score ?? 0)}
                     />
@@ -1159,16 +1159,16 @@ export function ResultView({
                     summary: "Uma alternativa mais econômica para manter a viagem viável, com menos atrito e gasto menor.",
                     context: cheaperOption.reason,
                     itinerary: [
-                      "Dia 1: chegada e instalacao em area pratica",
+                      "Dia 1: chegada e instalação em área prática",
                       "Dia 2: passeio principal com roteiro enxuto",
                       "Dia 3: experiência local com melhor custo-benefício",
                       "Dia 4: retorno com agenda leve",
                     ],
                     fullItinerary: [
-                      `Dia 1. Manha: chegada em ${cheaperOption.destination} e check-in. Tarde: deslocamentos curtos e organizacao pratica. Noite: jantar simples em area bem localizada.`,
-                      "Dia 2. Manha: passeio principal com inicio cedo. Tarde: continuidade do roteiro central com pausa leve. Noite: descanso e jantar acessivel.",
+                      `Dia 1. Manhã: chegada em ${cheaperOption.destination} e check-in. Tarde: deslocamentos curtos e organização prática. Noite: jantar simples em área bem localizada.`,
+                      "Dia 2. Manhã: passeio principal com início cedo. Tarde: continuidade do roteiro central com pausa leve. Noite: descanso e jantar acessível.",
                       "Dia 3. Manhã: experiência local complementar. Tarde: agenda com melhor custo-benefício. Noite: retorno tranquilo e planejamento final.",
-                      "Dia 4. Manha: ultimas visitas rapidas. Tarde: check-out e retorno. Noite: deslocamento final com menos etapas.",
+                      "Dia 4. Manhã: últimas visitas rápidas. Tarde: check-out e retorno. Noite: deslocamento final com menos etapas.",
                     ],
                     tips: [
                       "Hospedagens menores ajudam a controlar o orçamento.",
@@ -1196,7 +1196,7 @@ export function ResultView({
             <DialogHeader>
               <DialogTitle className="font-heading text-2xl text-foreground">Tentar outro destino</DialogTitle>
               <DialogDescription className="text-muted-foreground">
-                Escolha uma alternativa mockada sem sair da tela de resultado.
+                Escolha uma alternativa simulada sem sair da tela de resultado.
               </DialogDescription>
             </DialogHeader>
 
@@ -1219,10 +1219,10 @@ export function ResultView({
                         "Dia 4: gastronomia local e retorno",
                       ],
                       fullItinerary: [
-                        `Dia 1. Manha: chegada em ${alternative.destination} e check-in. Tarde: reconhecimento dos pontos principais. Noite: jantar leve e descanso.`,
+                        `Dia 1. Manhã: chegada em ${alternative.destination} e check-in. Tarde: reconhecimento dos pontos principais. Noite: jantar leve e descanso.`,
                         "Dia 2. Manhã: passeio principal da viagem. Tarde: continuidade da experiência com pausas confortáveis. Noite: tempo livre para gastronomia.",
                         "Dia 3. Manhã: atividade complementar. Tarde: bate-volta ou experiência local. Noite: encerramento leve do dia.",
-                        "Dia 4. Manha: ultimas visitas. Tarde: check-out e retorno. Noite: deslocamento final.",
+                        "Dia 4. Manhã: últimas visitas. Tarde: check-out e retorno. Noite: deslocamento final.",
                       ],
                       tips: [
                         "Cheque datas fora do pico para reduzir custos.",
@@ -1258,7 +1258,7 @@ export function ResultView({
 
             <div className="mt-6 grid gap-4 sm:grid-cols-2">
               <label className="block">
-                <span className="mb-2 block text-sm font-medium text-foreground">Orcamento</span>
+                <span className="mb-2 block text-sm font-medium text-foreground">Orçamento</span>
                 <input
                   value={adjustForm.budget}
                   onChange={(event) => setAdjustForm((value) => ({ ...value, budget: event.target.value }))}
@@ -1306,7 +1306,7 @@ export function ResultView({
                     summary: `Viagem ajustada para ${adjustForm.duration.toLowerCase()}, com estilo ${adjustForm.style.toLowerCase()} e foco em ${adjustForm.period.toLowerCase()}.`,
                     context: `A sugestão foi recalibrada com orçamento de ${adjustForm.budget}, duração de ${adjustForm.duration}, estilo ${adjustForm.style} e período ${adjustForm.period}.`,
                     itinerary: [
-                      `Dia 1: chegada e inicio da viagem com foco ${adjustForm.style.toLowerCase()}`,
+                      `Dia 1: chegada e início da viagem com foco ${adjustForm.style.toLowerCase()}`,
                       `Dia 2: roteiro principal ajustado para ${adjustForm.duration.toLowerCase()}`,
                       `Dia 3: experiência complementar pensada para ${adjustForm.period.toLowerCase()}`,
                       "Dia 4: fechamento da viagem com retorno otimizado",
@@ -1315,7 +1315,7 @@ export function ResultView({
                       `Dia 1. Manhã: chegada e check-in dentro do orçamento de ${adjustForm.budget}. Tarde: organização da agenda principal. Noite: jantar leve e descanso.`,
                       `Dia 2. Manhã: início do roteiro principal. Tarde: experiências alinhadas à duração de ${adjustForm.duration.toLowerCase()}. Noite: pausa confortável e gastronomia.`,
                       `Dia 3. Manhã: atividades alinhadas ao estilo ${adjustForm.style.toLowerCase()}. Tarde: experiência complementar no período de ${adjustForm.period.toLowerCase()}. Noite: fechamento leve do dia.`,
-                      "Dia 4. Manha: ultimos passeios. Tarde: check-out e retorno. Noite: encerramento da viagem.",
+                      "Dia 4. Manhã: últimos passeios. Tarde: check-out e retorno. Noite: encerramento da viagem.",
                     ],
                     tips: [
                       `Viajar em ${adjustForm.period.toLowerCase()} pode mudar disponibilidade e preço.`,
@@ -1375,3 +1375,6 @@ export function ResultView({
     </>
   )
 }
+
+
+

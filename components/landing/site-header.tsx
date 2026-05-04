@@ -44,7 +44,7 @@ export function SiteHeader() {
           </Button>
           <GradientButton asChild size="lg" className="h-11 rounded-full px-5 text-sm">
             <Link href="/quiz">
-              Comecar
+              Começar
               <ArrowRight className="size-4" />
             </Link>
           </GradientButton>

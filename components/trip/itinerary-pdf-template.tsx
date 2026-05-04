@@ -69,33 +69,9 @@ export function ItineraryPdfTemplate({
 
   function normalizePdfText(value: string) {
     return value
-      .replaceAll("historico", "hist\u00f3rico")
-      .replaceAll("hist\u00c3\u00b3rico", "hist\u00f3rico")
-      .replaceAll("programacao", "programa\u00e7\u00e3o")
-      .replaceAll("programa\u00c3\u00a7\u00c3\u00a3o", "programa\u00e7\u00e3o")
-      .replaceAll("cafe", "caf\u00e9")
-      .replaceAll("caf\u00c3\u00a9", "caf\u00e9")
-      .replaceAll("almoco", "almo\u00e7o")
-      .replaceAll("almo\u00c3\u00a7o", "almo\u00e7o")
-      .replaceAll("proxima", "pr\u00f3xima")
-      .replaceAll("pr\u00c3\u00b3xima", "pr\u00f3xima")
-      .replaceAll("experiencia", "experi\u00eancia")
-      .replaceAll("experi\u00c3\u00aancia", "experi\u00eancia")
-      .replaceAll("antecedencia", "anteced\u00eancia")
-      .replaceAll("anteced\u00c3\u00aancia", "anteced\u00eancia")
-      .replaceAll("preco", "pre\u00e7o")
-      .replaceAll("pre\u00c3\u00a7o", "pre\u00e7o")
-      .replaceAll("sugestao", "sugest\u00e3o")
-      .replaceAll("sugest\u00c3\u00a3o", "sugest\u00e3o")
-      .replaceAll("Observa\u00c3\u00a7\u00c3\u00b5es", "Observa\u00e7\u00f5es")
-      .replaceAll("voc\u00c3\u00aa", "voc\u00ea")
-      .replaceAll("prefer\u00c3\u00aancias", "prefer\u00eancias")
-      .replaceAll("\u00c3\u00banica", "\u00fanica")
-      .replaceAll("\u00e2\u20ac\u00a2", "\u2022")
-      .replaceAll("\u00e2\u20ac\u201d", "\u2014")
   }
 
-  const safePeriod = periodLabel ?? "Per\u00edodo n\u00e3o informado"
+  const safePeriod = periodLabel ?? "Período não informado"
   const safePeriodReason = periodReason ?? "Período ainda não definido para a viagem."
   const safeDates = startDate && endDate ? `${startDate} a ${endDate}` : startDate ?? endDate ?? "Não informado"
   const safeDuration = durationLabel ?? `${durationDays} ${durationDays === 1 ? "dia" : "dias"}`
