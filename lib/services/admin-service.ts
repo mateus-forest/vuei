@@ -1,7 +1,7 @@
 import type { CreditTransactionRow, PaymentRow, ProfileRow, SearchRow } from "@/types/database"
 import type { Search } from "@/types/search"
 import type { User } from "@/types/user"
-import type { TripResult } from "@/types/trip"
+import type { TripItineraryDay, TripResult } from "@/types/trip"
 import { createSupabaseAdminClient } from "@/lib/supabase/server"
 
 export type AdminPurchase = {
@@ -30,6 +30,30 @@ function asStringArray(value: unknown): string[] {
   return Array.isArray(value) ? value.filter((item): item is string => typeof item === "string") : []
 }
 
+function asDetailedItinerary(value: unknown): TripItineraryDay[] {
+  if (!Array.isArray(value)) {
+    return []
+  }
+
+  return value.flatMap((item, index) => {
+    if (typeof item !== "object" || item === null) {
+      return []
+    }
+
+    const day = item as Record<string, unknown>
+    return [
+      {
+        day: typeof day.day === "number" ? day.day : index + 1,
+        title: typeof day.title === "string" ? day.title : `Dia ${index + 1}`,
+        morning: typeof day.morning === "string" ? day.morning : "",
+        afternoon: typeof day.afternoon === "string" ? day.afternoon : "",
+        evening: typeof day.evening === "string" ? day.evening : "",
+        tips: asStringArray(day.tips),
+      },
+    ]
+  })
+}
+
 function formatCurrency(value: number) {
   return new Intl.NumberFormat("pt-BR", {
     style: "currency",
@@ -41,6 +65,7 @@ function mapSearchRowToSearch(row: SearchRow): Search {
   const rawResult = typeof row.result === "object" && row.result !== null ? (row.result as Record<string, unknown>) : {}
   const shortItinerary = asStringArray(rawResult.itinerary)
   const fullItinerary = asStringArray(rawResult.fullItinerary)
+  const detailedItinerary = asDetailedItinerary(rawResult.detailedItinerary)
   const tips = asStringArray(rawResult.tips)
   const destination = typeof rawResult.destination === "string" ? rawResult.destination : "Destino indisponível"
   const estimatedCost = typeof rawResult.estimatedCost === "string" ? rawResult.estimatedCost : "R$ 0"
@@ -59,6 +84,7 @@ function mapSearchRowToSearch(row: SearchRow): Search {
     summary,
     itinerary: shortItinerary,
     fullItinerary,
+    detailedItinerary,
     tips,
     context,
     intelligence,

@@ -15,6 +15,7 @@ import type {
   TripCostBreakdown,
   TripGenerationInput,
   TripGenerationResponse,
+  TripItineraryDay,
   TripOrigin,
   TripResult,
   TripVariant,
@@ -28,6 +29,15 @@ const aiBreakdownSchema = z.object({
   activities: z.number().nonnegative(),
 })
 
+const aiItineraryDaySchema = z.object({
+  day: z.number().int().positive(),
+  title: z.string().min(6),
+  morning: z.string().min(30),
+  afternoon: z.string().min(30),
+  evening: z.string().min(30),
+  tips: z.array(z.string().min(8)).min(2).max(4),
+})
+
 const aiVariantSchema = z.object({
   type: z.enum(["economic", "intermediate", "premium"]),
   title: z.string().min(2),
@@ -35,7 +45,7 @@ const aiVariantSchema = z.object({
   costPerPerson: z.number().positive(),
   breakdown: aiBreakdownSchema,
   assumptions: z.string().min(20),
-  itinerary: z.array(z.string().min(10)).min(3).max(10),
+  detailedItinerary: z.array(aiItineraryDaySchema).min(3).max(10),
 })
 
 const aiTripSchema = z.object({
@@ -565,6 +575,101 @@ function compactItineraryLine(value: string, index: number) {
   return sentence.startsWith("Dia") ? sentence : `Dia ${index + 1}: ${sentence}`
 }
 
+function fallbackItineraryDay({
+  day,
+  destination,
+  variantTitle,
+  request,
+}: {
+  day: number
+  destination: string
+  variantTitle: string
+  request: TripGenerationInput
+}): TripItineraryDay {
+  const profileText = `${request.profile?.style ?? ""} ${request.quizAnswers?.vibe ?? ""} ${request.inputText ?? ""}`.toLowerCase()
+  const isFamily = profileText.includes("familia")
+  const isAdventure = profileText.includes("avent")
+  const isLuxury = profileText.includes("luxo") || profileText.includes("premium")
+  const themes = [
+    {
+      title: "Chegada e reconhecimento da area",
+      morning: `Chegada, check-in e organizacao dos deslocamentos iniciais em uma regiao pratica de ${destination}.`,
+      afternoon: `Passeio leve pelo entorno principal para entender a logistica local, identificar restaurantes e mapear os pontos mais interessantes do roteiro.`,
+      evening: `Jantar em uma casa bem avaliada da regiao para comecar a viagem sem correria e ajustar o ritmo dos proximos dias.`,
+      tips: ["Salvar enderecos principais no mapa offline.", "Confirmar horarios de funcionamento para o dia seguinte."],
+    },
+    {
+      title: isAdventure ? "Natureza e atividade ao ar livre" : isLuxury ? "Experiencia central com mais conforto" : "Ponto principal do destino",
+      morning: isAdventure
+        ? `Saida cedo para a experiencia de natureza mais conhecida da viagem, com roteiro pensado para aproveitar melhor a luz da manha.`
+        : `Visita ao ponto mais relevante da viagem em horario estrategico, evitando filas mais intensas e aproveitando melhor o deslocamento.`,
+      afternoon: isAdventure
+        ? `Continuidade da experiencia com pausa para refeicao pratica e tempo reservado para mirantes, trilhas leves ou atividades complementares.`
+        : `Almoco proximo do atrativo principal e segunda etapa do passeio com foco em detalhes que costumam passar despercebidos em visitas corridas.`,
+      evening: isLuxury
+        ? `Noite com jantar mais elaborado e ambiente confortavel para transformar o dia principal em uma experiencia premium.`
+        : `Noite livre em uma area agradavel, com jantar local e retorno sem pressa para manter a viagem equilibrada.`,
+      tips: ["Comprar entradas com antecedencia quando houver.", "Levar camada extra de roupa ou item de clima conforme o destino."],
+    },
+    {
+      title: isFamily ? "Passeio leve e gastronomia" : "Cultura local e gastronomia",
+      morning: isFamily
+        ? `Manha dedicada a um passeio mais leve, com deslocamentos curtos e tempo para pausas confortaveis.`
+        : `Circuito por uma area de interesse cultural, com paradas em ruas, pracas, mercados ou centros historicos relevantes.`,
+      afternoon: `Parada para refeicao em um lugar conhecido da cidade e continuidade do roteiro com atividades praticas para o perfil ${variantTitle.toLowerCase()}.`,
+      evening: `Noite reservada para experimentar a gastronomia local em um endereco com boa reputacao entre viajantes e moradores.`,
+      tips: ["Reservar restaurante concorrido se necessario.", "Evitar deslocamentos longos no horario de maior movimento."],
+    },
+  ]
+
+  const theme = themes[(day - 1) % themes.length]
+
+  return {
+    day,
+    title: theme.title,
+    morning: theme.morning,
+    afternoon: theme.afternoon,
+    evening: theme.evening,
+    tips: theme.tips,
+  }
+}
+
+function normalizeDetailedItinerary({
+  values,
+  destination,
+  variantTitle,
+  request,
+  durationDays,
+}: {
+  values: Array<z.infer<typeof aiItineraryDaySchema>> | undefined
+  destination: string
+  variantTitle: string
+  request: TripGenerationInput
+  durationDays: number
+}) {
+  const totalDays = Math.max(3, Math.min(10, durationDays))
+
+  if (values && values.length >= 3) {
+    return values.slice(0, totalDays).map((day, index) => ({
+      day: index + 1,
+      title: normalizeText(day.title) || `Dia ${index + 1}`,
+      morning: normalizeText(day.morning),
+      afternoon: normalizeText(day.afternoon),
+      evening: normalizeText(day.evening),
+      tips: day.tips.map((tip) => normalizeText(tip)).filter(Boolean).slice(0, 4),
+    }))
+  }
+
+  return Array.from({ length: totalDays }, (_, index) =>
+    fallbackItineraryDay({
+      day: index + 1,
+      destination,
+      variantTitle,
+      request,
+    }),
+  )
+}
+
 function normalizeItinerary(values: string[], destination: string, variantTitle: string) {
   if (values.length >= 3) {
     return values.map((value, index) => {
@@ -651,7 +756,14 @@ function normalizeVariant({
     normalizeText(variant?.assumptions) ||
     buildAssumptions({ destination, variantTitle: titleByType[expectedType], travelers, durationDays, request })
   const assumptions = assumptionsBase.includes(pricing.message) ? assumptionsBase : `${assumptionsBase} ${pricing.message}`.trim()
-  const itinerary = normalizeItinerary(variant?.itinerary ?? [], destination, titleByType[expectedType])
+  const detailedItinerary = normalizeDetailedItinerary({
+    values: variant?.detailedItinerary,
+    destination,
+    variantTitle: titleByType[expectedType],
+    request,
+    durationDays,
+  })
+  const itinerary = detailedItinerary.map((day, index) => compactItineraryLine(day.title, index))
 
   return {
     type: expectedType,
@@ -661,6 +773,7 @@ function normalizeVariant({
     breakdown,
     assumptions,
     itinerary,
+    detailedItinerary,
   }
 }
 
@@ -850,6 +963,7 @@ function normalizeTripResult(result: TripResult, request?: TripGenerationInput):
     periodReason: result.periodReason ?? periodData?.periodReason ?? "Período ainda não definido para a viagem.",
     travelers,
     currency: "BRL",
+    detailedItinerary: result.detailedItinerary,
     fullItinerary: result.fullItinerary ?? result.itinerary,
     intelligence,
   }
@@ -982,8 +1096,11 @@ function mapStructuredOutputToTripResult(output: z.infer<typeof aiTripSchema>, r
       travelers,
       currency: "BRL",
       variants: normalizedVariants,
-      itinerary: selectedVariant.itinerary.map(compactItineraryLine),
-      fullItinerary: selectedVariant.itinerary,
+      itinerary: selectedVariant.itinerary,
+      fullItinerary: selectedVariant.detailedItinerary.map(
+        (day) => `Manha: ${day.morning} Tarde: ${day.afternoon} Noite: ${day.evening}`,
+      ),
+      detailedItinerary: selectedVariant.detailedItinerary,
       tips: output.tips.map((tip) => normalizeText(tip)).filter(Boolean),
       context: normalizeText(selectedVariant.assumptions),
       cheapestAlternative: normalizedVariants[0]?.title ? `${destination} ${normalizedVariants[0].title}` : undefined,
@@ -1081,6 +1198,12 @@ export async function generateTripWithAI(request: TripGenerationInput) {
                 "Sempre inclua três variações: economic, intermediate e premium.",
                 "Se houver scores e explicações do backend, use esses valores literalmente como referência.",
                 "Quando o usuario nao informar periodo, use o periodo recomendado pelo backend como base da viagem. Explique que o periodo foi sugerido pelo VUEI com base em clima, custo, lotacao e perfil. Nao invente datas exatas se elas nao foram fornecidas.",
+                "Cada variante deve trazer um detailedItinerary com objetos por dia contendo: day, title, morning, afternoon, evening e tips.",
+                "Os roteiros devem usar locais reais, nomes especificos, atividades concretas e uma sequencia plausivel de deslocamento.",
+                "Evite frases genericas e repetitivas como aproveite, inicie o dia, feche o dia e repeticoes do nome da cidade em todos os dias.",
+                "Cada dia precisa ser diferente do outro e alternar natureza, cultura, gastronomia, compras, descanso ou experiencias de acordo com o destino.",
+                "Os textos de morning, afternoon e evening devem soar como planejamento real de especialista em viagem.",
+                "Personalize o roteiro conforme perfil, orcamento, duracao e tipo de viagem. Familia pede atividades leves, aventura pede experiencias ativas e luxo pede enderecos premium.",
               ].join(" "),
             },
           ],
@@ -1420,11 +1543,5 @@ export function generateTripFromQuiz(answers: QuizAnswer): TripResult {
     },
   )
 }
-
-
-
-
-
-
 
 

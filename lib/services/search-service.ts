@@ -1,5 +1,5 @@
 import type { Search } from "@/types/search"
-import type { TripResult } from "@/types/trip"
+import type { TripItineraryDay, TripResult } from "@/types/trip"
 import type { SearchRow } from "@/types/database"
 import { createSupabaseAdminClient, createSupabaseServerClient } from "@/lib/supabase/server"
 
@@ -7,10 +7,27 @@ function asStringArray(value: unknown): string[] {
   return Array.isArray(value) ? value.filter((item): item is string => typeof item === "string") : []
 }
 
+function asDetailedItinerary(value: unknown): TripItineraryDay[] {
+  return Array.isArray(value)
+    ? value.filter(
+        (item): item is TripItineraryDay =>
+          typeof item === "object" &&
+          item !== null &&
+          typeof item.day === "number" &&
+          typeof item.title === "string" &&
+          typeof item.morning === "string" &&
+          typeof item.afternoon === "string" &&
+          typeof item.evening === "string" &&
+          Array.isArray(item.tips),
+      )
+    : []
+}
+
 function mapSearchRowToSearch(row: SearchRow): Search {
   const rawResult = typeof row.result === "object" && row.result !== null ? (row.result as Record<string, unknown>) : {}
   const shortItinerary = asStringArray(rawResult.itinerary)
   const fullItinerary = asStringArray(rawResult.fullItinerary)
+  const detailedItinerary = asDetailedItinerary(rawResult.detailedItinerary)
   const tips = asStringArray(rawResult.tips)
   const destination = typeof rawResult.destination === "string" ? rawResult.destination : "Destino indisponível"
   const estimatedCost = typeof rawResult.estimatedCost === "string" ? rawResult.estimatedCost : "R$ 0"
@@ -43,6 +60,7 @@ function mapSearchRowToSearch(row: SearchRow): Search {
     periodReason,
     itinerary: shortItinerary,
     fullItinerary,
+    detailedItinerary,
     tips,
     context,
     intelligence,

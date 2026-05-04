@@ -8,6 +8,15 @@ export type TripCostBreakdown = {
   activities: number
 }
 
+export type TripItineraryDay = {
+  day: number
+  title: string
+  morning: string
+  afternoon: string
+  evening: string
+  tips: string[]
+}
+
 export type TripVariant = {
   type: "economic" | "intermediate" | "premium"
   title: string
@@ -16,6 +25,7 @@ export type TripVariant = {
   breakdown: TripCostBreakdown
   assumptions: string
   itinerary: string[]
+  detailedItinerary: TripItineraryDay[]
 }
 
 export type TripDataConfidence = "high" | "medium" | "low"
@@ -71,6 +81,7 @@ export type TripResult = {
   variants?: TripVariant[]
   itinerary: string[]
   fullItinerary?: string[]
+  detailedItinerary?: TripItineraryDay[]
   tips: string[]
   context: string
   cheapestAlternative?: string

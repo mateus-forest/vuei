@@ -11,6 +11,7 @@ type PdfBreakdownItem = {
 type PdfDetailedDay = {
   title: string
   description: string
+  tips: string[]
 }
 
 export function ItineraryPdfTemplate({
@@ -440,6 +441,16 @@ export function ItineraryPdfTemplate({
                 <div>
                   <h3 style={printStyles.fullDayTitle}>{normalizePdfText(day.title)}</h3>
                   <p style={printStyles.fullDayText}>{normalizePdfText(day.description)}</p>
+                  {day.tips.length > 0 ? (
+                    <ul style={{ ...printStyles.list, marginTop: "8px" }}>
+                      {day.tips.map((tip) => (
+                        <li key={tip} style={{ ...printStyles.listItem, padding: "8px 10px", fontSize: "11px" }}>
+                          <span style={printStyles.itemNumber}>{"\u2022"}</span>
+                          <span>{normalizePdfText(tip)}</span>
+                        </li>
+                      ))}
+                    </ul>
+                  ) : null}
                 </div>
               </div>
             ))}

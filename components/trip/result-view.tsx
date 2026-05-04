@@ -15,7 +15,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog"
-import type { TripResult } from "@/types/trip"
+import type { TripItineraryDay, TripResult } from "@/types/trip"
 import { cn } from "@/lib/utils"
 
 type VariantId = "economico" | "intermediario" | "premium"
@@ -25,7 +25,8 @@ type DayPeriodPlan = {
   title: string
   morning: string
   afternoon: string
-  night: string
+  evening: string
+  tips: string[]
 }
 
 type TripVariant = {
@@ -36,6 +37,7 @@ type TripVariant = {
   breakdown: Array<{ label: string; value: number }>
   result: TripResult
   periodItinerary: DayPeriodPlan[]
+  detailedItinerary: TripItineraryDay[]
 }
 
 type CompleteTripSummary = {
@@ -56,7 +58,7 @@ type CompleteTripSummary = {
   breakdown: Array<{ label: string; total: string; perPerson: string }>
   assumptions: string
   shortItinerary: string[]
-  fullItinerary: Array<{ title: string; description: string }>
+  fullItinerary: Array<{ title: string; description: string; tips: string[] }>
   insights: string[]
   whyThisTrip: string[]
   attentionPoints: string[]
@@ -77,6 +79,13 @@ function InlineBadge({ children, className }: { children: ReactNode; className?:
 }
 
 function buildDetailedItinerary(result: TripResult) {
+  if (result.detailedItinerary?.length) {
+    return result.detailedItinerary.map(
+      (day) =>
+        `${day.title}. Manha: ${day.morning} Tarde: ${day.afternoon} Noite: ${day.evening}${day.tips.length ? ` Dicas: ${day.tips.join("; ")}` : ""}`,
+    )
+  }
+
   return (
     result.fullItinerary ??
     result.itinerary.map((day, index) => {
@@ -152,6 +161,16 @@ function buildBreakdown(total: number, tier: VariantId) {
 }
 
 function buildPeriodItinerary(result: TripResult, detailedItinerary: string[], variantId: VariantId): DayPeriodPlan[] {
+  if (result.detailedItinerary?.length) {
+    return result.detailedItinerary.map((day, index) => ({
+      title: day.title || `Dia ${index + 1}`,
+      morning: day.morning,
+      afternoon: day.afternoon,
+      evening: day.evening,
+      tips: day.tips,
+    }))
+  }
+
   const momentsByVariant: Record<VariantId, { morning: string; afternoon: string; night: string }> = {
     economico: {
       morning: `Comece o dia em ${result.destination} com deslocamentos praticos e agenda objetiva.`,
@@ -178,7 +197,8 @@ function buildPeriodItinerary(result: TripResult, detailedItinerary: string[], v
       title,
       morning: moments.morning,
       afternoon: `${moments.afternoon} ${description}`.trim(),
-      night: moments.night,
+      evening: moments.night,
+      tips: [],
     }
   })
 }
@@ -197,6 +217,7 @@ function buildTripVariants(result: TripResult, currentCost: number) {
     total: number
     insight: string
     itinerary: string[]
+    detailedItinerary?: TripItineraryDay[]
     breakdown?: Array<{ label: string; value: number }>
   }> = [
     {
@@ -206,6 +227,7 @@ function buildTripVariants(result: TripResult, currentCost: number) {
       insight:
         "Prioriza o essencial da viagem com hospedagem mais enxuta, logistica simples e custo menor para comparar com clareza.",
       itinerary: result.itinerary,
+      detailedItinerary: result.detailedItinerary,
     },
     {
       id: "intermediario",
@@ -214,6 +236,7 @@ function buildTripVariants(result: TripResult, currentCost: number) {
       insight:
         "Equilibra conforto, localizacao e experiencias centrais sem elevar demais o investimento total da viagem.",
       itinerary: result.itinerary,
+      detailedItinerary: result.detailedItinerary,
     },
     {
       id: "premium",
@@ -222,6 +245,7 @@ function buildTripVariants(result: TripResult, currentCost: number) {
       insight:
         "Aumenta conforto e conveniencia com hospedagem melhor localizada, deslocamentos mais fluidos e agenda mais completa.",
       itinerary: result.itinerary,
+      detailedItinerary: result.detailedItinerary,
     },
   ]
 
@@ -255,6 +279,7 @@ function buildTripVariants(result: TripResult, currentCost: number) {
         total: variant.source.totalCost,
         insight: variant.source.assumptions?.trim() || result.context,
         itinerary: variant.source.itinerary,
+        detailedItinerary: variant.source.detailedItinerary,
         breakdown: [
           { label: "Passagens", value: variant.source.breakdown.flights },
           { label: "Hospedagem", value: variant.source.breakdown.lodging },
@@ -269,6 +294,7 @@ function buildTripVariants(result: TripResult, currentCost: number) {
     const resultForItinerary: TripResult = {
       ...result,
       itinerary: variant.itinerary,
+      detailedItinerary: variant.detailedItinerary,
     }
     const periodItinerary = buildPeriodItinerary(resultForItinerary, baseDetailedItinerary, variant.id)
     const tipsByVariant: Record<VariantId, string[]> = {
@@ -298,12 +324,14 @@ function buildTripVariants(result: TripResult, currentCost: number) {
     const resultForVariant: TripResult = {
       ...result,
       itinerary: variant.itinerary,
+      detailedItinerary: variant.detailedItinerary,
       estimatedCost: formatPrice(variant.total),
       summary: summaryByVariant[variant.id],
       context: variant.insight,
       tips: tipsByVariant[variant.id],
       fullItinerary: periodItinerary.map(
-        (day) => `${day.title}. Manha: ${day.morning} Tarde: ${day.afternoon} Noite: ${day.night}`,
+        (day) =>
+          `${day.title}. Manha: ${day.morning} Tarde: ${day.afternoon} Noite: ${day.evening}${day.tips.length ? ` Dicas: ${day.tips.join("; ")}` : ""}`,
       ),
     }
 
@@ -312,6 +340,7 @@ function buildTripVariants(result: TripResult, currentCost: number) {
       breakdown: variant.breakdown ?? buildBreakdown(variant.total, variant.id),
       result: resultForVariant,
       periodItinerary,
+      detailedItinerary: variant.detailedItinerary ?? result.detailedItinerary ?? [],
     }
   })
 }
@@ -425,11 +454,13 @@ function buildCompleteTripSummary({
     variant.periodItinerary.length > 0
       ? variant.periodItinerary.map((day, index) => ({
           title: day.title || `Dia ${index + 1}`,
-          description: [`Manha: ${day.morning}`, `Tarde: ${day.afternoon}`, `Noite: ${day.night}`].join(" "),
+          description: [`Manha: ${day.morning}`, `Tarde: ${day.afternoon}`, `Noite: ${day.evening}`].join(" "),
+          tips: day.tips,
         }))
       : (result.fullItinerary ?? buildDetailedItinerary(result)).filter(Boolean).map((day, index) => ({
           title: result.itinerary[index] ?? `Dia ${index + 1}`,
           description: day,
+          tips: [],
         }))
 
   const whyThisTrip = [
@@ -647,7 +678,9 @@ export function ResultView({
   const tripVariants = useMemo(() => buildTripVariants(currentResult, baseCost), [currentResult, baseCost])
   const activeVariant = tripVariants.find((variant) => variant.id === selectedVariant) ?? tripVariants[1] ?? tripVariants[0]
   const activeResult = activeVariant.result
-  const activePeriodItinerary = activeVariant.periodItinerary.filter((item) => item.title || item.morning || item.afternoon || item.night)
+  const activePeriodItinerary = activeVariant.periodItinerary.filter(
+    (item) => item.title || item.morning || item.afternoon || item.evening,
+  )
   const activeDetailedItinerary = (activeResult.fullItinerary ?? buildDetailedItinerary(activeResult)).filter(Boolean)
   const activeCost = parsePrice(activeResult.estimatedCost)
   const travelersCount = Math.max(1, activeResult.travelers ?? inferTravelers(activeResult.bestFor))
@@ -880,6 +913,15 @@ export function ResultView({
                   <div key={`${day.title}-${day.description}`} className="rounded-[22px] border border-border/60 bg-secondary/15 p-4">
                     <div className="font-medium text-foreground">{day.title}</div>
                     <div className="mt-3">{day.description}</div>
+                    {day.tips.length > 0 ? (
+                      <div className="mt-3 space-y-2">
+                        {day.tips.map((tip) => (
+                          <div key={tip} className="rounded-2xl bg-white/70 px-3 py-2 text-xs leading-5 text-muted-foreground">
+                            {tip}
+                          </div>
+                        ))}
+                      </div>
+                    ) : null}
                   </div>
                 ))}
               </div>
