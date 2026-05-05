@@ -31,6 +31,7 @@ Thumbs.db
 # Cache
 .cache/
 *.log
+maintenance/backups/
 
 # v0 sandbox internal files
 __v0_runtime_loader.js

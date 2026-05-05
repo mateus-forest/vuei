@@ -5,7 +5,7 @@ export const mockUser: User = {
   name: "Mateus",
   email: "mateus@vuei.app",
   phone: "(54) 99990-2688",
-  credits: 3,
+  credits: 1,
   role: "user",
   freeSearchUsed: true,
   planLabel: "Explorador",

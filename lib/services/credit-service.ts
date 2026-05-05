@@ -1,6 +1,6 @@
 import { creditPackages } from "@/lib/constants/credit-packages"
 
-export const INITIAL_BONUS_CREDITS = 3
+export const INITIAL_BONUS_CREDITS = 1
 export const CREDITS_PER_GENERATED_TRIP = 1
 
 export function listCreditPackages() {
