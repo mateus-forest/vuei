@@ -31,20 +31,20 @@ const aiBreakdownSchema = z.object({
 
 const aiItineraryDaySchema = z.object({
   day: z.number().int().positive(),
-  title: z.string().min(6),
-  morning: z.string().min(30),
-  afternoon: z.string().min(30),
-  evening: z.string().min(30),
-  tips: z.array(z.string().min(8)).min(2).max(4),
+  title: z.string().min(6).max(80),
+  morning: z.string().min(30).max(220),
+  afternoon: z.string().min(30).max(220),
+  evening: z.string().min(30).max(220),
+  tips: z.array(z.string().min(8).max(120)).min(2).max(4),
 })
 
 const aiVariantSchema = z.object({
   type: z.enum(["economic", "intermediate", "premium"]),
-  title: z.string().min(2),
+  title: z.string().min(2).max(40),
   totalCost: z.number().positive(),
   costPerPerson: z.number().positive(),
   breakdown: aiBreakdownSchema,
-  assumptions: z.string().min(20),
+  assumptions: z.string().min(20).max(320),
   detailedItinerary: z.array(aiItineraryDaySchema).min(3).max(10),
 })
 
@@ -56,9 +56,9 @@ const aiTripSchema = z.object({
   durationDays: z.number().int().positive(),
   travelers: z.number().int().positive(),
   currency: z.literal("BRL"),
-  summary: z.string().min(30),
-  bestFor: z.string().min(3),
-  tips: z.array(z.string().min(8)).min(3).max(6),
+  summary: z.string().min(30).max(280),
+  bestFor: z.string().min(3).max(120),
+  tips: z.array(z.string().min(8).max(140)).min(3).max(6),
   variants: z.array(aiVariantSchema).length(3),
 })
 
@@ -96,6 +96,75 @@ type SeasonalVariantPricing = {
   breakdown: TripCostBreakdown
   multiplier: number
   message: string
+}
+
+type AIParseErrorCode = "AI_JSON_INVALID" | "AI_JSON_NOT_FOUND" | "AI_SCHEMA_INVALID"
+
+function createAIParseError(code: AIParseErrorCode, message: string, detail?: string) {
+  const error = new Error(message)
+  ;(error as Error & { status: number; code: AIParseErrorCode; detail?: string }).status = 502
+  ;(error as Error & { status: number; code: AIParseErrorCode; detail?: string }).code = code
+  ;(error as Error & { status: number; code: AIParseErrorCode; detail?: string }).detail = detail
+  return error
+}
+
+function extractJsonFromAIResponse(rawResponse: string) {
+  const trimmed = rawResponse.trim()
+
+  if (!trimmed) {
+    return null
+  }
+
+  const fencedMatch = trimmed.match(/```(?:json)?\s*([\s\S]*?)\s*```/i)
+  if (fencedMatch?.[1]) {
+    return fencedMatch[1].trim()
+  }
+
+  const objectMatch = trimmed.match(/\{[\s\S]*\}/)
+  if (objectMatch?.[0]) {
+    return objectMatch[0].trim()
+  }
+
+  return null
+}
+
+function parseAITripPayload(rawResponse: string) {
+  const directPayload = rawResponse.trim()
+  let parsed: unknown
+
+  try {
+    parsed = JSON.parse(directPayload)
+  } catch (directError) {
+    console.error("Erro ao parsear IA:", rawResponse)
+
+    const extractedJson = extractJsonFromAIResponse(rawResponse)
+
+    if (!extractedJson) {
+      throw createAIParseError("AI_JSON_NOT_FOUND", "Nenhum JSON encontrado na resposta da IA")
+    }
+
+    try {
+      parsed = JSON.parse(extractedJson)
+    } catch (extractedError) {
+      throw createAIParseError(
+        "AI_JSON_INVALID",
+        "IA retornou JSON inválido",
+        extractedError instanceof Error ? extractedError.message : String(extractedError),
+      )
+    }
+
+    if (directError instanceof Error) {
+      console.error("Falha no parse direto da IA:", directError.message)
+    }
+  }
+
+  const validated = aiTripSchema.safeParse(parsed)
+
+  if (!validated.success) {
+    throw createAIParseError("AI_SCHEMA_INVALID", "IA retornou JSON inválido para o schema esperado", validated.error.message)
+  }
+
+  return validated.data
 }
 
 function normalizeText(value: string | null | undefined) {
@@ -1123,6 +1192,17 @@ function resolveAIError(error: unknown) {
     }
   }
 
+  if (
+    message.includes("IA retornou JSON inválido") ||
+    message.includes("Nenhum JSON encontrado na resposta da IA") ||
+    message.includes("schema esperado")
+  ) {
+    return {
+      status: 502,
+      message: "A IA respondeu em um formato inválido. Tente novamente em instantes.",
+    }
+  }
+
   if (message.includes("OPENAI_API_KEY")) {
     return {
       status: 503,
@@ -1171,13 +1251,15 @@ export async function generateTripWithAI(request: TripGenerationInput) {
   const backendPresentationContext = destinationHint
     ? JSON.stringify(buildTripIntelligence(destinationHint, request), null, 2)
     : "Sem dados estruturados adicionais do backend."
+  const openaiStartedAt = Date.now()
+  let rawAIResponse = ""
 
   console.time("openai-call")
 
   try {
-    const response = await client.responses.parse({
+    const response = await client.responses.create({
       model: "gpt-4.1-mini",
-      max_output_tokens: 1400,
+      max_output_tokens: 1100,
       input: [
         {
           role: "system",
@@ -1204,6 +1286,8 @@ export async function generateTripWithAI(request: TripGenerationInput) {
                 "Cada dia precisa ser diferente do outro e alternar natureza, cultura, gastronomia, compras, descanso ou experiencias de acordo com o destino.",
                 "Os textos de morning, afternoon e evening devem soar como planejamento real de especialista em viagem.",
                 "Personalize o roteiro conforme perfil, orcamento, duracao e tipo de viagem. Familia pede atividades leves, aventura pede experiencias ativas e luxo pede enderecos premium.",
+                "Retorne APENAS JSON válido. Não inclua texto antes ou depois. Não use comentários. Garanta que todas as strings estejam corretamente fechadas.",
+                "Mantenha o JSON compacto. Resuma summary, assumptions e tips. Cada campo morning, afternoon e evening deve ter no máximo duas frases curtas.",
               ].join(" "),
             },
           ],
@@ -1228,11 +1312,32 @@ ${backendPresentationContext}`,
       },
     })
 
-    if (response.output_parsed) {
-      return mapStructuredOutputToTripResult(response.output_parsed, request)
+    rawAIResponse =
+      typeof response.output_text === "string" && response.output_text.trim()
+        ? response.output_text
+        : "output_parsed" in response && response.output_parsed
+          ? JSON.stringify(response.output_parsed)
+          : ""
+
+    console.info("OpenAI raw response", {
+      elapsedMs: Date.now() - openaiStartedAt,
+      responseId: "id" in response ? response.id : undefined,
+      rawResponse: rawAIResponse,
+    })
+
+    if (!rawAIResponse.trim()) {
+      throw createAIParseError("AI_JSON_NOT_FOUND", "Nenhum JSON encontrado na resposta da IA")
     }
 
-    throw new Error("OpenAI returned no structured output")
+    const parsedOutput = parseAITripPayload(rawAIResponse)
+    return mapStructuredOutputToTripResult(parsedOutput, request)
+  } catch (error) {
+    console.error("OpenAI parse/call failed", {
+      elapsedMs: Date.now() - openaiStartedAt,
+      error,
+      rawResponse: rawAIResponse,
+    })
+    throw error
   } finally {
     console.timeEnd("openai-call")
   }
