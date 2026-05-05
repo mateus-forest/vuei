@@ -15,12 +15,12 @@ export function FinalCtaSection() {
           <span className="bg-[linear-gradient(90deg,#5de0e6,#004aad)] bg-clip-text text-transparent">próxima viagem</span>?
         </h2>
         <p className="mx-auto mt-5 max-w-2xl text-lg text-muted-foreground">
-          Comece com uma busca gratuita, valide a ideia em segundos e siga com login quando quiser continuar.
+          Escolha entre buscador rápido e quiz guiado, faça login e continue a geração com o contexto já preenchido.
         </p>
         <div className="mt-9 flex flex-wrap justify-center gap-3">
           <GradientButton asChild size="lg" className="px-8">
-            <Link href="/resultado?input=quero%20viajar%20para%20europa%20com%205%20mil%20reais">
-              Gerar simulação
+            <Link href="/#planejar">
+              Começar agora
               <ArrowRight className="size-5" />
             </Link>
           </GradientButton>

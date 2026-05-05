@@ -43,8 +43,8 @@ export function SiteHeader() {
             <Link href="/login">Entrar</Link>
           </Button>
           <GradientButton asChild size="lg" className="h-11 rounded-full px-5 text-sm">
-            <Link href="/quiz">
-              Começar
+            <Link href="/#planejar">
+              Planejar viagem
               <ArrowRight className="size-4" />
             </Link>
           </GradientButton>
@@ -81,11 +81,11 @@ export function SiteHeader() {
               Entrar
             </Link>
             <Link
-              href="/quiz"
+              href="/#planejar"
               onClick={closeMenu}
               className="rounded-2xl bg-[linear-gradient(135deg,#5de0e6,#004aad)] px-4 py-3 text-sm font-medium text-white shadow-[0_12px_35px_-18px_rgba(0,74,173,0.75)]"
             >
-              Começar
+              Planejar viagem
             </Link>
           </nav>
         </div>

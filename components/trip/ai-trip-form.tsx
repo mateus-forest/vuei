@@ -5,6 +5,7 @@ import { useEffect, useMemo, useState, useTransition } from "react"
 import { useRouter } from "next/navigation"
 import { ArrowRight, Plane, Sparkles } from "lucide-react"
 import { heroSuggestions } from "@/lib/constants/trip-suggestions"
+import { savePendingTripRequest } from "@/lib/services/pending-trip-service"
 import { getClientSession } from "@/lib/services/session-service"
 import { sanitizeTripProfileInput } from "@/lib/travel/trip-profile"
 import { BrandCard } from "@/components/ui/brand-card"
@@ -24,6 +25,7 @@ type AiTripFormProps = {
   defaultValue?: string
   redirectTo?: string
   enforceFreeSearchLimit?: boolean
+  requireAuthBeforeSubmit?: boolean
 }
 
 type TripGenerationApiResponse =
@@ -128,6 +130,7 @@ export function AiTripForm({
   defaultValue = "",
   redirectTo = "/resultado",
   enforceFreeSearchLimit = false,
+  requireAuthBeforeSubmit = false,
 }: AiTripFormProps) {
   const [query, setQuery] = useState(defaultValue)
   const [profile, setProfile] = useState<TripProfileInput>(emptyProfile)
@@ -172,6 +175,21 @@ export function AiTripForm({
     setError("")
     const source = selectedSuggestion && trimmed === selectedSuggestion ? "sugestao" : "busca"
     const session = await getClientSession()
+
+    if (!session.isAuthenticated && requireAuthBeforeSubmit) {
+      savePendingTripRequest({
+        flow: "search",
+        redirectTo,
+        payload: {
+          origin: source,
+          input: trimmed,
+          profile: profilePayload,
+        },
+      })
+      router.push("/login")
+      setIsSubmitting(false)
+      return
+    }
 
     if (!session.isAuthenticated && enforceFreeSearchLimit && freeSearchBlocked) {
       setError("Você já usou sua busca gratuita. Crie uma conta para continuar.")

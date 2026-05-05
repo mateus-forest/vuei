@@ -3,6 +3,7 @@
 import { useState, useTransition } from "react"
 import { useRouter } from "next/navigation"
 import { ArrowRight, Sparkles } from "lucide-react"
+import { savePendingTripRequest } from "@/lib/services/pending-trip-service"
 import { getClientSession } from "@/lib/services/session-service"
 import { GradientButton } from "@/components/ui/gradient-button"
 import { BrandCard } from "@/components/ui/brand-card"
@@ -74,7 +75,13 @@ async function readJsonResponse(response: Response) {
   }
 }
 
-export function QuizForm({ redirectTo = "/resultado" }: { redirectTo?: string }) {
+export function QuizForm({
+  redirectTo = "/resultado",
+  requireAuthBeforeSubmit = false,
+}: {
+  redirectTo?: string
+  requireAuthBeforeSubmit?: boolean
+}) {
   const [answers, setAnswers] = useState<QuizAnswer>(defaultAnswers)
   const [familyCounts, setFamilyCounts] = useState({ adults: "2", children: "0" })
   const [error, setError] = useState("")
@@ -91,6 +98,20 @@ export function QuizForm({ redirectTo = "/resultado" }: { redirectTo?: string })
     setError("")
     const payload = new URLSearchParams(answers).toString()
     const session = await getClientSession()
+
+    if (!session.isAuthenticated && requireAuthBeforeSubmit) {
+      savePendingTripRequest({
+        flow: "quiz",
+        redirectTo,
+        payload: {
+          origin: "quiz",
+          quizAnswers: answers,
+        },
+      })
+      router.push("/login")
+      setIsSubmitting(false)
+      return
+    }
 
     try {
       const response = await fetch("/api/ai/generate-trip", {

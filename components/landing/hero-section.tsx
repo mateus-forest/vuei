@@ -1,7 +1,8 @@
 import Image from "next/image"
-import { Sparkles } from "lucide-react"
-import { AiTripForm } from "@/components/trip/ai-trip-form"
+import Link from "next/link"
+import { ArrowRight, Sparkles } from "lucide-react"
 import { BrandBadge } from "@/components/ui/brand-badge"
+import { GradientButton } from "@/components/ui/gradient-button"
 import { SectionShell } from "@/components/ui/section-shell"
 
 export function HeroSection() {
@@ -39,8 +40,13 @@ export function HeroSection() {
           Clareza para decidir rápido. O VUEI sugere destinos, estima custos e resume o roteiro ideal para você.
         </p>
 
-        <div className="mx-auto mt-7 max-w-4xl">
-          <AiTripForm enforceFreeSearchLimit />
+        <div className="mt-8 flex justify-center">
+          <GradientButton asChild size="lg" className="px-8">
+            <Link href="/#planejar">
+              Escolher como começar
+              <ArrowRight className="size-5" />
+            </Link>
+          </GradientButton>
         </div>
 
         <p className="mt-10 text-sm text-muted-foreground">

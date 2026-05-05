@@ -6,11 +6,16 @@ import { ArrowRight, LockKeyhole, Mail, User2 } from "lucide-react"
 import { BrandCard } from "@/components/ui/brand-card"
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { GradientButton } from "@/components/ui/gradient-button"
+import { clearPendingTripRequest, readPendingTripRequest } from "@/lib/services/pending-trip-service"
 import { sendPasswordReset, signInWithPassword, signUpWithPassword } from "@/lib/services/session-service"
 
 type BootstrapProfileResponse =
   | { ok: true; data: { profileId: string } }
   | { ok: false; error: string; detail?: string }
+
+type TripGenerationApiResponse =
+  | { ok: true; data: { persisted: boolean; tripId?: string; remainingCredits?: number; result?: unknown } }
+  | { ok: false; error: string; code?: string }
 
 export function AuthForm({ mode }: { mode: "login" | "signup" }) {
   const isLogin = mode === "login"
@@ -20,6 +25,27 @@ export function AuthForm({ mode }: { mode: "login" | "signup" }) {
   const [recoveryFeedback, setRecoveryFeedback] = useState("")
   const [authError, setAuthError] = useState("")
   const [isSubmitting, setIsSubmitting] = useState(false)
+
+  async function readJsonResponse(response: Response) {
+    const contentType = response.headers.get("content-type") || ""
+    const rawBody = await response.text()
+
+    if (!rawBody.trim()) {
+      return null
+    }
+
+    if (!contentType.includes("application/json")) {
+      console.error("Expected JSON response but received:", contentType, rawBody)
+      return null
+    }
+
+    try {
+      return JSON.parse(rawBody) as TripGenerationApiResponse
+    } catch (error) {
+      console.error("Failed to parse resumed trip generation response JSON", error, rawBody)
+      return null
+    }
+  }
 
   async function bootstrapProfile(name: string) {
     const response = await fetch("/api/auth/bootstrap-profile", {
@@ -92,6 +118,45 @@ export function AuthForm({ mode }: { mode: "login" | "signup" }) {
     window.location.assign(destination)
   }
 
+  async function resumePendingTripGeneration() {
+    const pendingTripRequest = readPendingTripRequest()
+
+    if (!pendingTripRequest) {
+      return null
+    }
+
+    const response = await fetch("/api/ai/generate-trip", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(pendingTripRequest.payload),
+    })
+
+    const payload = await readJsonResponse(response)
+
+    if (!response.ok || !payload?.ok) {
+      const message =
+        payload && !payload.ok ? payload.error : "Sua conta foi autenticada, mas não foi possível gerar a viagem agora."
+      throw new Error(message)
+    }
+
+    clearPendingTripRequest()
+
+    const separator = pendingTripRequest.redirectTo.includes("?") ? "&" : "?"
+
+    if (payload.data.tripId) {
+      return `${pendingTripRequest.redirectTo}${separator}tripId=${encodeURIComponent(payload.data.tripId)}`
+    }
+
+    if (pendingTripRequest.flow === "quiz") {
+      const query = new URLSearchParams(pendingTripRequest.payload.quizAnswers).toString()
+      return `${pendingTripRequest.redirectTo}${separator}source=quiz&${query}`
+    }
+
+    return `${pendingTripRequest.redirectTo}${separator}input=${encodeURIComponent(pendingTripRequest.payload.input)}&source=${pendingTripRequest.payload.origin}`
+  }
+
   async function handlePrimaryAction() {
     setIsSubmitting(true)
     setAuthError("")
@@ -114,6 +179,16 @@ export function AuthForm({ mode }: { mode: "login" | "signup" }) {
           await bootstrapProfile(data.user.user_metadata?.name ?? form.name)
         } catch (bootstrapError) {
           console.error("Profile bootstrap failed after login", bootstrapError)
+        }
+
+        const pendingDestination = await resumePendingTripGeneration().catch((resumeError) => {
+          console.error("Failed to resume pending trip generation after login", resumeError)
+          throw resumeError
+        })
+
+        if (pendingDestination) {
+          goToDestination(pendingDestination)
+          return
         }
 
         goToDestination(await resolvePostAuthDestination(data.user.id, data.user.email))
@@ -145,6 +220,16 @@ export function AuthForm({ mode }: { mode: "login" | "signup" }) {
         await bootstrapProfile(form.name)
       } catch (bootstrapError) {
         console.error("Profile bootstrap failed after signup", bootstrapError)
+      }
+
+      const pendingDestination = await resumePendingTripGeneration().catch((resumeError) => {
+        console.error("Failed to resume pending trip generation after signup", resumeError)
+        throw resumeError
+      })
+
+      if (pendingDestination) {
+        goToDestination(pendingDestination)
+        return
       }
 
       goToDestination(await resolvePostAuthDestination(data.user.id, data.user.email))
