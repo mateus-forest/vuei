@@ -7,6 +7,7 @@ import { ArrowRight, LockKeyhole, Mail, User2 } from "lucide-react"
 import { BrandCard } from "@/components/ui/brand-card"
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { GradientButton } from "@/components/ui/gradient-button"
+import { clearAnonymousTripResult, readAnonymousTripResult } from "@/lib/services/guest-trip-service"
 import { clearPendingTripRequest, readPendingTripRequest } from "@/lib/services/pending-trip-service"
 import { clearPostAuthRedirect, readPostAuthRedirect } from "@/lib/services/post-auth-redirect-service"
 import { sendPasswordReset, signInWithPassword, signUpWithPassword } from "@/lib/services/session-service"
@@ -133,6 +134,35 @@ export function AuthForm({ mode }: { mode: "login" | "signup" }) {
     window.location.assign(destination)
   }
 
+  async function linkAnonymousPreviewAfterAuth() {
+    const anonymousTrip = readAnonymousTripResult()
+
+    if (!anonymousTrip?.tripId) {
+      return null
+    }
+
+    const response = await fetch("/api/searches", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        tripId: anonymousTrip.tripId,
+      }),
+    })
+
+    const payload = (await response.json().catch(() => null)) as { ok?: boolean; data?: { tripId?: string } } | null
+
+    if (!response.ok || !payload?.ok || !payload.data?.tripId) {
+      return null
+    }
+
+    clearAnonymousTripResult()
+    clearPostAuthRedirect()
+
+    return `/dashboard/resultado?tripId=${encodeURIComponent(payload.data.tripId)}`
+  }
+
   async function resumePendingTripGeneration() {
     const pendingTripRequest = readPendingTripRequest()
 
@@ -206,6 +236,16 @@ export function AuthForm({ mode }: { mode: "login" | "signup" }) {
           return
         }
 
+        const linkedPreviewDestination = await linkAnonymousPreviewAfterAuth().catch((linkError) => {
+          console.error("Failed to link anonymous preview after login", linkError)
+          return null
+        })
+
+        if (linkedPreviewDestination) {
+          goToDestination(linkedPreviewDestination)
+          return
+        }
+
         goToDestination(await resolvePostAuthDestination(data.user.id, data.user.email))
         return
       }
@@ -244,6 +284,16 @@ export function AuthForm({ mode }: { mode: "login" | "signup" }) {
 
       if (pendingDestination) {
         goToDestination(pendingDestination)
+        return
+      }
+
+      const linkedPreviewDestination = await linkAnonymousPreviewAfterAuth().catch((linkError) => {
+        console.error("Failed to link anonymous preview after signup", linkError)
+        return null
+      })
+
+      if (linkedPreviewDestination) {
+        goToDestination(linkedPreviewDestination)
         return
       }
 

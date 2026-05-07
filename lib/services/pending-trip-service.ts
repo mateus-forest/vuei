@@ -24,6 +24,7 @@ export type PendingQuizTripRequest = PendingTripBase & {
   payload: {
     origin: "quiz"
     quizAnswers: QuizAnswer
+    travelers?: number
   }
 }
 

@@ -234,8 +234,16 @@ export function resolveTripPeriod(
 
   const durationDays = userProfile.durationDays > 0 ? userProfile.durationDays : resolveDurationDays(request, destinationData)
   const bestMonths = destinationData.bestMonths?.filter((month) => month >= 1 && month <= 12) ?? []
+  const preferredSeasonMonths =
+    request.quizAnswers?.region === "brasil" && request.quizAnswers?.vibe === "verao"
+      ? [12, 1, 2, 3]
+      : request.quizAnswers?.vibe === "inverno"
+        ? [6, 7, 8]
+        : []
 
   const suggestedMonth =
+    preferredSeasonMonths.find((month) => bestMonths.includes(month)) ??
+    preferredSeasonMonths[0] ??
     bestMonths[0] ??
     Array.from({ length: 12 }, (_, index) => index + 1)
       .map((month) => ({

@@ -4,12 +4,12 @@ import Link from "next/link"
 import { useEffect, useState, useTransition } from "react"
 import { useRouter } from "next/navigation"
 import { ArrowRight, Sparkles } from "lucide-react"
-import { hasUsedGuestTrip, markGuestTripUsed } from "@/lib/services/guest-trip-service"
+import { hasUsedGuestTrip, markGuestTripUsed, saveAnonymousTripResult } from "@/lib/services/guest-trip-service"
 import { savePendingTripRequest } from "@/lib/services/pending-trip-service"
 import { getClientSession } from "@/lib/services/session-service"
 import { GradientButton } from "@/components/ui/gradient-button"
 import { BrandCard } from "@/components/ui/brand-card"
-import type { QuizAnswer } from "@/types/trip"
+import type { QuizAnswer, TripResult } from "@/types/trip"
 
 const options = {
   tripStyle: ["solo", "romantica", "familia", "aventura", "descanso", "luxo", "cultural"] as const,
@@ -123,6 +123,14 @@ export function QuizForm({
     setError("")
     const payload = new URLSearchParams(answers).toString()
     const session = await getClientSession()
+    const travelers =
+      answers.tripStyle === "familia"
+        ? Math.max(1, Number.parseInt(familyCounts.adults || "0", 10) + Number.parseInt(familyCounts.children || "0", 10))
+        : answers.tripStyle === "solo"
+          ? 1
+          : answers.tripStyle === "romantica"
+            ? 2
+            : undefined
 
     if (!session.isAuthenticated && enforceFreeSearchLimit && freeSearchBlocked) {
       setError("Você já usou sua busca gratuita. Crie uma conta para continuar.")
@@ -137,6 +145,7 @@ export function QuizForm({
         payload: {
           origin: "quiz",
           quizAnswers: answers,
+          travelers,
         },
       })
       router.push("/login")
@@ -153,6 +162,7 @@ export function QuizForm({
         body: JSON.stringify({
           origin: "quiz",
           quizAnswers: answers,
+          travelers,
         }),
       })
 
@@ -167,6 +177,15 @@ export function QuizForm({
       if (!session.isAuthenticated && enforceFreeSearchLimit) {
         markGuestTripUsed()
         setFreeSearchBlocked(true)
+
+        if (result.data.tripId && result.data.result) {
+          saveAnonymousTripResult({
+            tripId: result.data.tripId,
+            source: "quiz",
+            result: result.data.result as TripResult,
+            createdAt: new Date().toISOString(),
+          })
+        }
       }
 
       if (result.data.tripId) {

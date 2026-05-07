@@ -5,7 +5,7 @@ import { useEffect, useMemo, useState, useTransition } from "react"
 import { useRouter } from "next/navigation"
 import { ArrowRight, Plane, Sparkles } from "lucide-react"
 import { heroSuggestions } from "@/lib/constants/trip-suggestions"
-import { hasUsedGuestTrip, markGuestTripUsed } from "@/lib/services/guest-trip-service"
+import { hasUsedGuestTrip, markGuestTripUsed, saveAnonymousTripResult } from "@/lib/services/guest-trip-service"
 import { savePendingTripRequest } from "@/lib/services/pending-trip-service"
 import { getClientSession } from "@/lib/services/session-service"
 import { sanitizeTripProfileInput } from "@/lib/travel/trip-profile"
@@ -13,6 +13,7 @@ import { BrandCard } from "@/components/ui/brand-card"
 import { GradientButton } from "@/components/ui/gradient-button"
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion"
 import type {
+  TripResult,
   TripProfileFlightPreference,
   TripProfileInput,
   TripProfilePace,
@@ -221,6 +222,15 @@ export function AiTripForm({
       if (!session.isAuthenticated && enforceFreeSearchLimit) {
         markGuestTripUsed()
         setFreeSearchBlocked(true)
+
+        if (payload.data.tripId && payload.data.result) {
+          saveAnonymousTripResult({
+            tripId: payload.data.tripId,
+            source,
+            result: payload.data.result as TripResult,
+            createdAt: new Date().toISOString(),
+          })
+        }
       }
 
       if (payload.data.tripId) {

@@ -28,6 +28,17 @@ export type TripVariant = {
   detailedItinerary: TripItineraryDay[]
 }
 
+export type TripResultSource = "anonymous_landing" | "authenticated"
+export type TripResultType = "preview" | "full"
+export type TripVariantType = "economic" | "intermediate" | "premium"
+
+export type TripGeneratedSections = {
+  initialPreview: boolean
+  fullItinerary: boolean
+  detailedBudget: boolean
+  comparison: boolean
+}
+
 export type TripDataConfidence = "high" | "medium" | "low"
 
 export type OvercrowdingLabel = "tranquilo" | "moderado" | "muito cheio"
@@ -86,6 +97,14 @@ export type TripResult = {
   context: string
   cheapestAlternative?: string
   intelligence?: TripIntelligence
+  source?: TripResultSource
+  resultType?: TripResultType
+  isAnonymousPreview?: boolean
+  requiresAuthForActions?: boolean
+  linkedAfterLogin?: boolean
+  creditsConsumed?: number
+  selectedVariantType?: TripVariantType
+  generatedSections?: TripGeneratedSections
 }
 
 export type QuizAnswer = {
@@ -127,6 +146,7 @@ export type TripGenerationInput = {
   inputText?: string
   quizAnswers?: QuizAnswer
   profile?: TripProfileInput
+  travelers?: number
   userId?: string
 }
 

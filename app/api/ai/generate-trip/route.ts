@@ -29,6 +29,7 @@ const generateTripPayloadSchema = z.object({
   input: z.string().optional(),
   quizAnswers: quizAnswersSchema.optional(),
   profile: tripProfileSchema.optional().nullable(),
+  travelers: z.number().int().positive().max(20).optional(),
 })
 
 function jsonOk(data: unknown, init?: ResponseInit) {
@@ -76,6 +77,7 @@ export async function POST(request: Request) {
           inputText: body.input?.trim() || "quero viajar para europa com 5 mil reais",
           quizAnswers: body.quizAnswers,
           profile,
+          travelers: body.travelers,
         })
 
         let publicSearchId: string | undefined
@@ -139,6 +141,7 @@ export async function POST(request: Request) {
         inputText: body.input?.trim(),
         quizAnswers: body.quizAnswers,
         profile,
+        travelers: body.travelers,
         userId: session.userId ?? undefined,
       },
     })

@@ -67,6 +67,12 @@ type CompleteTripSummary = {
   summary: string
 }
 
+function mapVariantTypeToId(value?: TripResult["selectedVariantType"]): VariantId {
+  if (value === "economic") return "economico"
+  if (value === "premium") return "premium"
+  return "intermediario"
+}
+
 function InlineBadge({ children, className }: { children: ReactNode; className?: string }) {
   return (
     <div
@@ -577,11 +583,17 @@ function CostDetails({
   value,
   breakdown,
   travelersCount,
+  showDetails = true,
 }: {
   value: string
   breakdown: Array<{ label: string; value: number }>
   travelersCount: number
+  showDetails?: boolean
 }) {
+  if (!showDetails) {
+    return null
+  }
+
   return (
     <Accordion type="single" collapsible className="mt-3">
       <AccordionItem value={value} className="rounded-2xl border border-border/60 bg-white/70 px-3 last:border-b">
@@ -613,11 +625,13 @@ function VariantSelectorCard({
   isSelected,
   travelersCount,
   onSelect,
+  showCostDetails = true,
 }: {
   variant: TripVariant
   isSelected: boolean
   travelersCount: number
   onSelect: () => void
+  showCostDetails?: boolean
 }) {
   return (
     <div
@@ -645,7 +659,7 @@ function VariantSelectorCard({
         <p className="mt-4 text-sm leading-6 text-muted-foreground">{variant.insight}</p>
       </button>
 
-      <CostDetails value={`cost-${variant.id}`} breakdown={variant.breakdown} travelersCount={travelersCount} />
+      <CostDetails value={`cost-${variant.id}`} breakdown={variant.breakdown} travelersCount={travelersCount} showDetails={showCostDetails} />
     </div>
   )
 }
@@ -664,7 +678,7 @@ export function ResultView({
   suggestion?: string
 }) {
   const [currentResult, setCurrentResult] = useState(result)
-  const [selectedVariant, setSelectedVariant] = useState<VariantId>("intermediario")
+  const [selectedVariant, setSelectedVariant] = useState<VariantId>(() => mapVariantTypeToId(result.selectedVariantType))
   const [isCheaperOpen, setIsCheaperOpen] = useState(false)
   const [isAlternativesOpen, setIsAlternativesOpen] = useState(false)
   const [isAdjustOpen, setIsAdjustOpen] = useState(false)
@@ -681,6 +695,18 @@ export function ResultView({
     const query = searchParams.toString()
     return query ? `${pathname}?${query}` : pathname
   }, [pathname, searchParams])
+  const isAnonymousPreview =
+    !loggedIn && (currentResult.isAnonymousPreview ?? currentResult.requiresAuthForActions ?? currentResult.resultType === "preview")
+  const hasFullItineraryGenerated =
+    Boolean(currentResult.generatedSections?.fullItinerary) ||
+    Boolean(currentResult.detailedItinerary?.length) ||
+    Boolean(currentResult.fullItinerary?.length)
+  const authContinuationHref = `/login?next=${encodeURIComponent(currentResultPath)}`
+
+  function redirectToAuthForAction() {
+    savePostAuthRedirect(currentResultPath)
+    window.location.assign(authContinuationHref)
+  }
 
   const baseCost = parsePrice(currentResult.estimatedCost)
   const tripVariants = useMemo(() => buildTripVariants(currentResult, baseCost), [currentResult, baseCost])
@@ -741,6 +767,15 @@ export function ResultView({
   ]
 
   async function handleDownload() {
+    if (isAnonymousPreview) {
+      redirectToAuthForAction()
+      return
+    }
+
+    if (!hasFullItineraryGenerated) {
+      return
+    }
+
     if (!pdfTemplateRef.current) return
 
     const html2pdf = (await import("html2pdf.js")).default
@@ -827,7 +862,7 @@ export function ResultView({
           <BrandCard glow className="p-5 sm:p-6">
             <InlineBadge>
               <Compass className="size-4 text-[#5de0e6]" />
-              Sugestão principal
+              {isAnonymousPreview ? "Resultado inicial grátis" : "Sugestão principal"}
             </InlineBadge>
 
             <div className="mt-4 flex flex-col gap-5 lg:flex-row lg:items-start lg:justify-between">
@@ -856,6 +891,12 @@ export function ResultView({
                 ? completeTripSummary.periodReason
                 : `Período preservado a partir da busca. ${completeTripSummary.periodReason}`}
             </div>
+
+            {isAnonymousPreview ? (
+              <div className="mt-3 rounded-[20px] border border-[#5de0e6]/35 bg-[linear-gradient(135deg,#5de0e60f,#004aad10)] px-4 py-3 text-sm text-muted-foreground">
+                Esse é seu resultado inicial grátis. Crie sua conta para continuar explorando, salvar viagens e gerar roteiros completos.
+              </div>
+            ) : null}
           </BrandCard>
 
           <BrandCard className="p-5 sm:p-6">
@@ -883,6 +924,7 @@ export function ResultView({
                   isSelected={variant.id === selectedVariant}
                   travelersCount={travelersCount}
                   onSelect={() => setSelectedVariant(variant.id)}
+                  showCostDetails={!isAnonymousPreview}
                 />
               ))}
             </div>
@@ -901,40 +943,51 @@ export function ResultView({
               </div>
             </ExpandableSection>
 
-            <ExpandableSection value="full-itinerary" title="Ver roteiro completo">
+            {!isAnonymousPreview ? (
+            <ExpandableSection value="full-itinerary" title={hasFullItineraryGenerated ? "Ver roteiro completo" : "Gerar roteiro completo"}>
               <div className="space-y-3 text-sm leading-6 text-muted-foreground">
-                <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                  <div className="text-sm text-muted-foreground">
-                    {completeTripSummary.selectedVariantLabel} • {completeTripSummary.estimatedCost} • {completeTripSummary.costPerPerson} por pessoa
-                  </div>
-                  <button
-                    type="button"
-                    onClick={() => void handleDownload()}
-                    className="inline-flex items-center justify-center gap-2 rounded-2xl border border-border/60 bg-white/80 px-4 py-3 text-sm font-medium text-foreground transition hover:border-[#5de0e6]/60"
-                  >
-                    <Download className="size-4 text-[#004aad]" />
-                    Baixar roteiro
-                  </button>
-                </div>
-
-                {completeTripSummary.fullItinerary.map((day) => (
-                  <div key={`${day.title}-${day.description}`} className="rounded-[22px] border border-border/60 bg-secondary/15 p-4">
-                    <div className="font-medium text-foreground">{day.title}</div>
-                    <div className="mt-3">{day.description}</div>
-                    {day.tips.length > 0 ? (
-                      <div className="mt-3 space-y-2">
-                        {day.tips.map((tip) => (
-                          <div key={tip} className="rounded-2xl bg-white/70 px-3 py-2 text-xs leading-5 text-muted-foreground">
-                            {tip}
-                          </div>
-                        ))}
+                {hasFullItineraryGenerated ? (
+                  <>
+                    <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                      <div className="text-sm text-muted-foreground">
+                        {completeTripSummary.selectedVariantLabel} • {completeTripSummary.estimatedCost} • {completeTripSummary.costPerPerson} por pessoa
                       </div>
-                    ) : null}
+                      <button
+                        type="button"
+                        onClick={() => void handleDownload()}
+                        className="inline-flex items-center justify-center gap-2 rounded-2xl border border-border/60 bg-white/80 px-4 py-3 text-sm font-medium text-foreground transition hover:border-[#5de0e6]/60"
+                      >
+                        <Download className="size-4 text-[#004aad]" />
+                        Baixar roteiro
+                      </button>
+                    </div>
+
+                    {completeTripSummary.fullItinerary.map((day) => (
+                      <div key={`${day.title}-${day.description}`} className="rounded-[22px] border border-border/60 bg-secondary/15 p-4">
+                        <div className="font-medium text-foreground">{day.title}</div>
+                        <div className="mt-3">{day.description}</div>
+                        {day.tips.length > 0 ? (
+                          <div className="mt-3 space-y-2">
+                            {day.tips.map((tip) => (
+                              <div key={tip} className="rounded-2xl bg-white/70 px-3 py-2 text-xs leading-5 text-muted-foreground">
+                                {tip}
+                              </div>
+                            ))}
+                          </div>
+                        ) : null}
+                      </div>
+                    ))}
+                  </>
+                ) : (
+                  <div className="rounded-[22px] border border-border/60 bg-secondary/20 p-4">
+                    Gere o roteiro completo quando quiser aprofundar essa viagem. Essa ação consome 1 crédito na primeira geração.
                   </div>
-                ))}
+                )}
               </div>
             </ExpandableSection>
+            ) : null}
 
+            {!isAnonymousPreview ? (
             <ExpandableSection value="selected-insights" title="Ver insights da opção escolhida">
               <div className="space-y-3">
                 <div className="rounded-[22px] border border-border/60 bg-secondary/20 p-4 text-sm leading-6 text-muted-foreground">
@@ -947,8 +1000,9 @@ export function ResultView({
                 ))}
               </div>
             </ExpandableSection>
+            ) : null}
 
-            {intelligence ? (
+            {!isAnonymousPreview && intelligence ? (
               <ExpandableSection value="why-this-trip" title="Por que essa viagem faz sentido para você">
                 <div className="space-y-4">
                   <div className="rounded-[22px] border border-border/60 bg-secondary/20 p-4">
@@ -1014,6 +1068,7 @@ export function ResultView({
               </ExpandableSection>
             ) : null}
 
+            {!isAnonymousPreview ? (
             <ExpandableSection value="attention-points" title="Pontos de atenção">
               <div className="space-y-3">
                 {intelligence?.explanation?.attentionPoint ? (
@@ -1034,6 +1089,7 @@ export function ResultView({
                 ))}
               </div>
             </ExpandableSection>
+            ) : null}
           </Accordion>
         </div>
 
@@ -1045,15 +1101,20 @@ export function ResultView({
               <button
                 type="button"
                 onClick={() => void handleDownload()}
+                disabled={!isAnonymousPreview && !hasFullItineraryGenerated}
                 className="inline-flex w-full items-center justify-between rounded-2xl border border-border/60 bg-white/80 px-4 py-4 text-sm font-medium text-foreground transition hover:border-[#5de0e6]/60"
               >
-                Baixar roteiro
+                {isAnonymousPreview
+                  ? "Entre para continuar essa viagem"
+                  : !hasFullItineraryGenerated
+                    ? "Roteiro completo sob demanda"
+                    : "Baixar roteiro"}
                 <Download className="size-4 text-[#004aad]" />
               </button>
 
               <button
                 type="button"
-                onClick={() => setIsCheaperOpen(true)}
+                onClick={() => (isAnonymousPreview ? redirectToAuthForAction() : setIsCheaperOpen(true))}
                 className="inline-flex w-full items-center justify-between rounded-2xl border border-border/60 bg-white/80 px-4 py-4 text-sm font-medium text-foreground transition hover:border-[#5de0e6]/60"
               >
                 Ver opção mais barata
@@ -1062,7 +1123,7 @@ export function ResultView({
 
               <button
                 type="button"
-                onClick={() => setIsAlternativesOpen(true)}
+                onClick={() => (isAnonymousPreview ? redirectToAuthForAction() : setIsAlternativesOpen(true))}
                 className="inline-flex w-full items-center justify-between rounded-2xl border border-border/60 bg-white/80 px-4 py-4 text-sm font-medium text-foreground transition hover:border-[#5de0e6]/60"
               >
                 Tentar outro destino
@@ -1071,7 +1132,7 @@ export function ResultView({
 
               <button
                 type="button"
-                onClick={() => setIsAdjustOpen(true)}
+                onClick={() => (isAnonymousPreview ? redirectToAuthForAction() : setIsAdjustOpen(true))}
                 className="inline-flex w-full items-center justify-between rounded-2xl border border-border/60 bg-white/80 px-4 py-4 text-sm font-medium text-foreground transition hover:border-[#5de0e6]/60"
               >
                 Ajustar viagem

@@ -3,6 +3,10 @@ import type { TripItineraryDay, TripResult } from "@/types/trip"
 import type { SearchRow } from "@/types/database"
 import { createSupabaseAdminClient, createSupabaseServerClient } from "@/lib/supabase/server"
 
+function asVariants(value: unknown): TripResult["variants"] {
+  return Array.isArray(value) ? (value as TripResult["variants"]) : undefined
+}
+
 function asStringArray(value: unknown): string[] {
   return Array.isArray(value) ? value.filter((item): item is string => typeof item === "string") : []
 }
@@ -41,6 +45,26 @@ function mapSearchRowToSearch(row: SearchRow): Search {
   const durationLabel = typeof rawResult.durationLabel === "string" ? rawResult.durationLabel : undefined
   const isSuggestedPeriod = typeof rawResult.isSuggestedPeriod === "boolean" ? rawResult.isSuggestedPeriod : undefined
   const periodReason = typeof rawResult.periodReason === "string" ? rawResult.periodReason : undefined
+  const travelers = typeof rawResult.travelers === "number" ? rawResult.travelers : undefined
+  const currency = rawResult.currency === "BRL" ? "BRL" : undefined
+  const variants = asVariants(rawResult.variants)
+  const cheapestAlternative = typeof rawResult.cheapestAlternative === "string" ? rawResult.cheapestAlternative : undefined
+  const source = rawResult.source === "authenticated" || rawResult.source === "anonymous_landing" ? rawResult.source : undefined
+  const resultType = rawResult.resultType === "full" || rawResult.resultType === "preview" ? rawResult.resultType : undefined
+  const isAnonymousPreview = typeof rawResult.isAnonymousPreview === "boolean" ? rawResult.isAnonymousPreview : undefined
+  const requiresAuthForActions = typeof rawResult.requiresAuthForActions === "boolean" ? rawResult.requiresAuthForActions : undefined
+  const linkedAfterLogin = typeof rawResult.linkedAfterLogin === "boolean" ? rawResult.linkedAfterLogin : undefined
+  const creditsConsumed = typeof rawResult.creditsConsumed === "number" ? rawResult.creditsConsumed : undefined
+  const selectedVariantType =
+    rawResult.selectedVariantType === "economic" ||
+    rawResult.selectedVariantType === "intermediate" ||
+    rawResult.selectedVariantType === "premium"
+      ? rawResult.selectedVariantType
+      : undefined
+  const generatedSections =
+    typeof rawResult.generatedSections === "object" && rawResult.generatedSections !== null
+      ? (rawResult.generatedSections as TripResult["generatedSections"])
+      : undefined
   const intelligence =
     typeof rawResult.intelligence === "object" && rawResult.intelligence !== null
       ? (rawResult.intelligence as TripResult["intelligence"])
@@ -58,12 +82,24 @@ function mapSearchRowToSearch(row: SearchRow): Search {
     durationLabel,
     isSuggestedPeriod,
     periodReason,
+    travelers,
+    currency,
+    variants,
     itinerary: shortItinerary,
     fullItinerary,
     detailedItinerary,
     tips,
     context,
+    cheapestAlternative,
     intelligence,
+    source,
+    resultType,
+    isAnonymousPreview,
+    requiresAuthForActions,
+    linkedAfterLogin,
+    creditsConsumed,
+    selectedVariantType,
+    generatedSections,
   }
 
   return {

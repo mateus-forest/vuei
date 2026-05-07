@@ -19,6 +19,7 @@ import type {
   TripOrigin,
   TripResult,
   TripVariant,
+  TripVariantType,
 } from "@/types/trip"
 
 const aiBreakdownSchema = z.object({
@@ -243,6 +244,10 @@ function hashString(value: string) {
 }
 
 function inferTravelers(request: TripGenerationInput, bestFor = "") {
+  if (typeof request.travelers === "number" && request.travelers > 0) {
+    return request.travelers
+  }
+
   if (request.profile?.style === "solo") return 1
   if (request.profile?.style === "casal") return 2
   if (request.profile?.style === "familia") return 3
@@ -404,6 +409,60 @@ function resolveTravelTier(request: TripGenerationInput, bestFor: string) {
   if (text.includes("econom") || text.includes("barato") || text.includes("baixo custo")) return "economico" as const
 
   return "medio" as const
+}
+
+function resolveBudgetCapBRL(request: TripGenerationInput) {
+  switch (request.quizAnswers?.budget) {
+    case "ate-3000":
+      return 3000
+    case "ate-5000":
+      return 5000
+    case "ate-8000":
+      return 8000
+    case "acima-8000":
+      return 12000
+    default:
+      return undefined
+  }
+}
+
+function resolveSelectedVariantType(
+  variants: TripVariant[],
+  request: TripGenerationInput,
+  bestFor: string,
+): TripVariantType {
+  const budgetCap = resolveBudgetCapBRL(request)
+
+  if (budgetCap) {
+    const withinBudget = variants.filter((variant) => variant.totalCost <= budgetCap * 1.05)
+    if (withinBudget.some((variant) => variant.type === "premium")) return "premium"
+    if (withinBudget.some((variant) => variant.type === "intermediate")) return "intermediate"
+    if (withinBudget.some((variant) => variant.type === "economic")) return "economic"
+    return "economic"
+  }
+
+  const preferredTier = resolveTravelTier(request, bestFor)
+  if (preferredTier === "premium") return "premium"
+  if (preferredTier === "economico") return "economic"
+  return "intermediate"
+}
+
+function buildPreviewMetadata(request?: TripGenerationInput, overrides?: Partial<TripResult>) {
+  const isAuthenticated = Boolean(request?.userId)
+  return {
+    source: isAuthenticated ? ("authenticated" as const) : ("anonymous_landing" as const),
+    resultType: "preview" as const,
+    isAnonymousPreview: !isAuthenticated,
+    requiresAuthForActions: !isAuthenticated,
+    linkedAfterLogin: overrides?.linkedAfterLogin ?? false,
+    creditsConsumed: overrides?.creditsConsumed ?? 0,
+    generatedSections: {
+      initialPreview: true,
+      fullItinerary: false,
+      detailedBudget: false,
+      comparison: false,
+    },
+  }
 }
 
 function isInternationalDestination(request: TripGenerationInput, destination: string) {
@@ -1042,7 +1101,10 @@ function normalizeTripResult(result: TripResult, request?: TripGenerationInput):
   const periodData = request ? resolveTripPeriodData(request, result.destination) : null
   const travelers = request ? inferTravelers(request, bestFor) : result.travelers ?? 2
   const intelligence = request ? buildTripIntelligence(result.destination, request).intelligence : result.intelligence
-  const selectedVariant = result.variants?.find((variant) => variant.type === "intermediate") ?? result.variants?.[0]
+  const selectedVariantType =
+    result.selectedVariantType ??
+    (result.variants?.length ? resolveSelectedVariantType(result.variants, request ?? { origin: "busca" }, bestFor) : "intermediate")
+  const selectedVariant = result.variants?.find((variant) => variant.type === selectedVariantType) ?? result.variants?.[0]
   const normalizedCost = selectedVariant ? formatTripCost(selectedVariant.totalCost) : request ? normalizeEstimatedCost(result.estimatedCost, request, bestFor) : result.estimatedCost
 
   return {
@@ -1061,6 +1123,8 @@ function normalizeTripResult(result: TripResult, request?: TripGenerationInput):
     detailedItinerary: result.detailedItinerary,
     fullItinerary: result.fullItinerary ?? result.itinerary,
     intelligence,
+    selectedVariantType,
+    ...buildPreviewMetadata(request, result),
   }
 }
 
@@ -1086,6 +1150,7 @@ function buildUserPrompt(request: TripGenerationInput) {
     (request.origin === "quiz" && request.quizAnswers ? generateTripFromQuiz(request.quizAnswers).destination : undefined)
   const periodData = resolveTripPeriodData(request, destinationHint)
   const travelers = inferTravelers(request)
+  const budgetCap = resolveBudgetCapBRL(request)
   const profileLines = request.profile
     ? [
         "Perfil complementar informado:",
@@ -1201,7 +1266,8 @@ function buildCompactTripResult({
     travelers,
     durationDays,
   })
-  const selectedVariant = normalizedVariants.find((variant) => variant.type === "intermediate") ?? normalizedVariants[1]
+  const selectedVariantType = resolveSelectedVariantType(normalizedVariants, request, bestFor)
+  const selectedVariant = normalizedVariants.find((variant) => variant.type === selectedVariantType) ?? normalizedVariants[1] ?? normalizedVariants[0]
   const intelligenceSummary = buildTripIntelligence(destination, request).intelligence.explanation.summary
   const safeContext = normalizeText(context) || "Estimativa inicial gerada com base nas informações disponíveis."
 
@@ -1224,10 +1290,8 @@ function buildCompactTripResult({
       currency: "BRL",
       variants: normalizedVariants,
       itinerary: selectedVariant.itinerary.slice(0, 3),
-      fullItinerary: selectedVariant.detailedItinerary.map(
-        (day) => `Manha: ${day.morning} Tarde: ${day.afternoon} Noite: ${day.evening}`,
-      ),
-      detailedItinerary: selectedVariant.detailedItinerary,
+      fullItinerary: [],
+      detailedItinerary: [],
       tips: buildCompactTips({
         context: safeContext,
         intelligenceSummary,
@@ -1235,6 +1299,7 @@ function buildCompactTripResult({
       }),
       context: safeContext,
       cheapestAlternative: normalizedVariants[0]?.title ? `${destination} ${normalizedVariants[0].title}` : undefined,
+      selectedVariantType,
     },
     request,
   )
@@ -1242,10 +1307,16 @@ function buildCompactTripResult({
 
 function mapStructuredOutputToTripResult(output: z.infer<typeof aiTripSchema>, request: TripGenerationInput): TripResult {
   const fallbackDestination = extractDestinationFromInput(request.inputText) ?? generateTripFromInput(request.inputText ?? "").destination
-  const destination = normalizeText(output.destination) || fallbackDestination
+  const rawDestination = normalizeText(output.destination) || fallbackDestination
+  const destination =
+    request.quizAnswers?.region === "brasil" && isInternationalDestination(request, rawDestination)
+      ? generateTripFromQuiz(request.quizAnswers).destination
+      : request.quizAnswers?.region === "internacional" && !isInternationalDestination(request, rawDestination)
+        ? generateTripFromQuiz(request.quizAnswers).destination
+        : rawDestination
   const periodData = resolveTripPeriodData(request, destination)
   const durationDays = output.durationDays > 0 ? output.durationDays : periodData.durationDays
-  const travelers = output.travelers > 0 ? output.travelers : inferTravelers(request, output.bestFor)
+  const travelers = inferTravelers(request, output.bestFor)
 
   return buildCompactTripResult({
     request,
@@ -1406,6 +1477,10 @@ export async function generateTripWithAI(request: TripGenerationInput) {
                 "Cada variant deve ter type, title, totalCost, costPerPerson, breakdown, assumptions e itineraryPreview.",
                 "itineraryPreview deve ter no máximo 3 itens curtos.",
                 "Não inclua roteiro completo detalhado.",
+                "Respeite exatamente o total de viajantes informado pelo backend.",
+                "Se a região for Brasil, o destino final precisa estar no Brasil.",
+                "Se o contexto indicar verão no Brasil, prefira dezembro, janeiro, fevereiro ou início de março.",
+                "A variante principal deve respeitar o orçamento informado; premium não pode ser principal quando só a econômica cabe.",
                 "O JSON deve ser compacto, estável e sem texto adicional.",
               ].join(" "),
             },
