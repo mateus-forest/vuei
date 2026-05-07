@@ -682,6 +682,8 @@ export function ResultView({
   const [isCheaperOpen, setIsCheaperOpen] = useState(false)
   const [isAlternativesOpen, setIsAlternativesOpen] = useState(false)
   const [isAdjustOpen, setIsAdjustOpen] = useState(false)
+  const [isGeneratingFullItinerary, setIsGeneratingFullItinerary] = useState(false)
+  const [actionError, setActionError] = useState("")
   const [adjustForm, setAdjustForm] = useState({
     budget: "R$ 4.500",
     duration: "5 dias",
@@ -695,6 +697,7 @@ export function ResultView({
     const query = searchParams.toString()
     return query ? `${pathname}?${query}` : pathname
   }, [pathname, searchParams])
+  const currentTripId = searchParams.get("tripId") ?? ""
   const isAnonymousPreview =
     !loggedIn && (currentResult.isAnonymousPreview ?? currentResult.requiresAuthForActions ?? currentResult.resultType === "preview")
   const hasFullItineraryGenerated =
@@ -706,6 +709,47 @@ export function ResultView({
   function redirectToAuthForAction() {
     savePostAuthRedirect(currentResultPath)
     window.location.assign(authContinuationHref)
+  }
+
+  async function handleGenerateFullItinerary() {
+    if (isAnonymousPreview) {
+      redirectToAuthForAction()
+      return
+    }
+
+    if (!loggedIn || !currentTripId || hasFullItineraryGenerated) {
+      return
+    }
+
+    setIsGeneratingFullItinerary(true)
+    setActionError("")
+
+    try {
+      const response = await fetch(`/api/searches/${encodeURIComponent(currentTripId)}/full-itinerary`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+      })
+
+      const payload = (await response.json().catch(() => null)) as
+        | { ok: true; data: { result: TripResult } }
+        | { ok: false; error: string }
+        | null
+
+      if (!response.ok || !payload?.ok) {
+        setActionError((payload && !payload.ok && payload.error) || "Não foi possível gerar o roteiro completo agora.")
+        return
+      }
+
+      setCurrentResult(payload.data.result)
+      setSelectedVariant(mapVariantTypeToId(payload.data.result.selectedVariantType))
+    } catch (error) {
+      console.error("Failed to generate full itinerary", error)
+      setActionError("Não foi possível gerar o roteiro completo agora.")
+    } finally {
+      setIsGeneratingFullItinerary(false)
+    }
   }
 
   const baseCost = parsePrice(currentResult.estimatedCost)
@@ -979,8 +1023,17 @@ export function ResultView({
                     ))}
                   </>
                 ) : (
-                  <div className="rounded-[22px] border border-border/60 bg-secondary/20 p-4">
-                    Gere o roteiro completo quando quiser aprofundar essa viagem. Essa ação consome 1 crédito na primeira geração.
+                  <div className="space-y-3 rounded-[22px] border border-border/60 bg-secondary/20 p-4">
+                    <div>Gere o roteiro completo quando quiser aprofundar essa viagem. Essa ação consome 1 crédito na primeira geração.</div>
+                    <button
+                      type="button"
+                      onClick={() => void handleGenerateFullItinerary()}
+                      disabled={isGeneratingFullItinerary}
+                      className="inline-flex items-center justify-center rounded-2xl border border-border/60 bg-white/80 px-4 py-3 text-sm font-medium text-foreground transition hover:border-[#5de0e6]/60 disabled:cursor-not-allowed disabled:opacity-70"
+                    >
+                      {isGeneratingFullItinerary ? "Gerando roteiro completo..." : "Gerar roteiro completo"}
+                    </button>
+                    {actionError ? <div className="text-sm text-[#b42318]">{actionError}</div> : null}
                   </div>
                 )}
               </div>
@@ -1100,14 +1153,16 @@ export function ResultView({
             <div className="mt-4 grid gap-3">
               <button
                 type="button"
-                onClick={() => void handleDownload()}
-                disabled={!isAnonymousPreview && !hasFullItineraryGenerated}
+                onClick={() => void (hasFullItineraryGenerated ? handleDownload() : handleGenerateFullItinerary())}
+                disabled={isGeneratingFullItinerary}
                 className="inline-flex w-full items-center justify-between rounded-2xl border border-border/60 bg-white/80 px-4 py-4 text-sm font-medium text-foreground transition hover:border-[#5de0e6]/60"
               >
                 {isAnonymousPreview
                   ? "Entre para continuar essa viagem"
                   : !hasFullItineraryGenerated
-                    ? "Roteiro completo sob demanda"
+                    ? isGeneratingFullItinerary
+                      ? "Gerando roteiro completo..."
+                      : "Roteiro completo sob demanda"
                     : "Baixar roteiro"}
                 <Download className="size-4 text-[#004aad]" />
               </button>
@@ -1151,6 +1206,7 @@ export function ResultView({
               <SummaryStat label="Período" value={tripPeriodText} />
               <SummaryStat label="Ideal para" value={bestForText} />
             </div>
+            {actionError ? <div className="mt-3 text-sm text-[#b42318]">{actionError}</div> : null}
           </BrandCard>
 
           {loggedIn ? (

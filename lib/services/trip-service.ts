@@ -7,6 +7,7 @@ import { CREDITS_PER_GENERATED_TRIP } from "@/lib/services/credit-service"
 import { getCurrentUser } from "@/lib/services/user-service"
 import { createSupabaseAdminClient } from "@/lib/supabase/server"
 import { buildTripIntelligence } from "@/lib/travel/travel-intelligence"
+import { findDestinationKnowledge } from "@/lib/travel/travel-intelligence"
 import { applySeasonalityMultiplier, getSeasonalityPriceMessage, scaleBreakdownToTotal } from "@/lib/travel/seasonality"
 import { getTripMonth, resolveTripPeriod } from "@/lib/travel/trip-period"
 import type { AppSession } from "@/types/session"
@@ -46,7 +47,7 @@ const aiVariantSchema = z.object({
   costPerPerson: z.number().positive(),
   breakdown: aiBreakdownSchema,
   assumptions: z.string().min(12).max(180),
-  itineraryPreview: z.array(z.string().min(8).max(90)).min(2).max(3),
+  itineraryPreview: z.array(z.string().min(8).max(90)).min(2).max(10),
 })
 
 const aiTripSchema = z.object({
@@ -487,9 +488,17 @@ function isInternationalDestination(request: TripGenerationInput, destination: s
     "roma",
     "madrid",
     "londres",
+    "europa",
+    "europe",
     "orlando",
     "miami",
     "nova york",
+    "estados unidos",
+    "usa",
+    "argentina",
+    "buenos aires",
+    "chile",
+    "santiago",
     "punta cana",
     "cartagena",
     "lisboa",
@@ -497,6 +506,45 @@ function isInternationalDestination(request: TripGenerationInput, destination: s
   ]
 
   return internationalHints.some((hint) => normalized.includes(hint))
+}
+
+function requestedBrazilScope(request: TripGenerationInput) {
+  if (request.quizAnswers?.region === "brasil") {
+    return true
+  }
+
+  const text = (request.inputText ?? "").toLowerCase()
+  return ["brasil", "nacional", "nacionais", "doméstico", "domestico", "dentro do brasil"].some((hint) => text.includes(hint))
+}
+
+function selectDomesticFallbackDestination(request: TripGenerationInput) {
+  const vibe = request.quizAnswers?.vibe
+  const style = request.quizAnswers?.tripStyle ?? request.profile?.style
+  const budgetCap = resolveBudgetCapBRL(request) ?? 8000
+
+  if (vibe === "inverno") return budgetCap <= 5000 ? "Campos do Jordão" : "Gramado"
+  if (vibe === "natureza") return style === "familia" ? "Foz do Iguaçu" : "Bonito"
+  if (vibe === "cultura") return "Recife"
+  if (style === "familia" && budgetCap <= 8000) return "Porto Seguro"
+  if (vibe === "praia" || vibe === "verao") return budgetCap <= 5000 ? "João Pessoa" : "Maceió"
+  return "Florianópolis"
+}
+
+function normalizeDestinationToScope(destination: string, request: TripGenerationInput) {
+  const normalizedDestination = normalizeText(destination) || selectDomesticFallbackDestination(request)
+
+  if (!requestedBrazilScope(request)) {
+    return normalizedDestination
+  }
+
+  const knowledge = findDestinationKnowledge(normalizedDestination, request)
+  const isDomesticByKnowledge = knowledge.destinationData.region === "Brasil" || knowledge.destinationData.country === "Brasil"
+
+  if (!isDomesticByKnowledge || isInternationalDestination({ ...request, quizAnswers: { ...request.quizAnswers, region: "brasil" } as QuizAnswer }, normalizedDestination)) {
+    return selectDomesticFallbackDestination(request)
+  }
+
+  return normalizedDestination
 }
 
 function buildBaseVariantCost({
@@ -822,9 +870,11 @@ function normalizeDetailedItinerary({
   )
 }
 
-function normalizeItinerary(values: string[], destination: string, variantTitle: string) {
+function normalizeItinerary(values: string[], destination: string, variantTitle: string, durationDays: number) {
+  const totalDays = Math.max(3, Math.min(10, durationDays))
   if (values.length >= 3) {
-    return values.slice(0, 3).map((value, index) => {
+    return Array.from({ length: totalDays }, (_, index) => {
+      const value = values[index] ?? values[index % values.length]
       const normalized = normalizeText(value)
       return normalized.startsWith("Dia") ? normalized : `Dia ${index + 1}: ${normalized}`
     })
@@ -835,6 +885,35 @@ function normalizeItinerary(values: string[], destination: string, variantTitle:
     `Dia 2: aproveite o principal passeio de ${destination}, com pausas adequadas e custos compatíveis com a proposta ${variantTitle.toLowerCase()}.`,
     `Dia 3: finalize a viagem com experiências complementares, gastronomia e retorno planejado.`,
   ]
+}
+
+function normalizePreviewItinerary(values: string[], destination: string, variantTitle: string, durationDays: number) {
+  const totalDays = Math.max(3, Math.min(10, durationDays))
+
+  if (values.length >= 1) {
+    return Array.from({ length: totalDays }, (_, index) => {
+      const value = normalizeText(values[index] ?? values[index % values.length])
+      return value.startsWith("Dia") ? value : `Dia ${index + 1}: ${value}`
+    })
+  }
+
+  return Array.from({ length: totalDays }, (_, index) => {
+    if (index === 0) {
+      return `Dia 1: chegada em ${destination}, organização da hospedagem e primeira experiência leve.`
+    }
+
+    if (index === totalDays - 1) {
+      return `Dia ${index + 1}: encerramento da viagem, últimas experiências e retorno planejado.`
+    }
+
+    const dayThemes = [
+      `Dia ${index + 1}: passeio principal com ritmo ${variantTitle.toLowerCase()} e deslocamentos bem distribuídos.`,
+      `Dia ${index + 1}: experiência cultural, gastronômica ou de natureza alinhada ao perfil da viagem.`,
+      `Dia ${index + 1}: agenda complementar com tempo livre e passeio secundário para variar o roteiro.`,
+    ]
+
+    return dayThemes[(index - 1) % dayThemes.length]
+  })
 }
 
 function buildAssumptions({
@@ -908,7 +987,7 @@ function normalizeVariant({
     normalizeText(variant?.assumptions) ||
     buildAssumptions({ destination, variantTitle: titleByType[expectedType], travelers, durationDays, request })
   const assumptions = assumptionsBase.includes(pricing.message) ? assumptionsBase : `${assumptionsBase} ${pricing.message}`.trim()
-  const itineraryPreview = normalizeItinerary(variant?.itineraryPreview ?? [], destination, titleByType[expectedType])
+  const itineraryPreview = normalizePreviewItinerary(variant?.itineraryPreview ?? [], destination, titleByType[expectedType], durationDays)
   const detailedItinerary = normalizeDetailedItinerary({
     values: undefined,
     previewLines: itineraryPreview,
@@ -917,7 +996,7 @@ function normalizeVariant({
     request,
     durationDays,
   })
-  const itinerary = itineraryPreview.length ? itineraryPreview : detailedItinerary.map((day, index) => compactItineraryLine(day.title, index)).slice(0, 3)
+  const itinerary = itineraryPreview.length ? itineraryPreview : detailedItinerary.map((day, index) => compactItineraryLine(day.title, index))
 
   return {
     type: expectedType,
@@ -1013,19 +1092,26 @@ function ensureVariantOrdering({
       normalizeVariant({ variant: undefined, expectedType: "intermediate", request, destination, bestFor, travelers, durationDays }),
     premium ?? normalizeVariant({ variant: undefined, expectedType: "premium", request, destination, bestFor, travelers, durationDays }),
   ]
+  const budgetCap = resolveBudgetCapBRL(request)
 
   const economicSeed = clampTripCost(Math.min(orderedVariants[0].totalCost, fallbackIntermediate - minStep))
   const intermediateSeed = clampTripCost(orderedVariants[1].totalCost)
   const premiumSeed = clampTripCost(orderedVariants[2].totalCost)
   const hasInconsistentTotals = !(economicSeed < intermediateSeed && intermediateSeed < premiumSeed)
 
-  const economicTotal = hasInconsistentTotals ? clampTripCost(Math.min(economicSeed, fallbackEconomic)) : economicSeed
-  const intermediateTotal = hasInconsistentTotals
-    ? clampTripCost(Math.max(roundCurrency(economicTotal * 1.35), economicTotal + minStep))
-    : clampTripCost(Math.max(intermediateSeed, economicTotal + minStep))
-  const premiumTotal = hasInconsistentTotals
-    ? clampTripCost(Math.max(roundCurrency(intermediateTotal * 1.45), intermediateTotal + minStep))
-    : clampTripCost(Math.max(premiumSeed, intermediateTotal + minStep))
+  const economicBase = hasInconsistentTotals ? Math.min(economicSeed, fallbackEconomic) : economicSeed
+  const economicTargetMax = budgetCap ? roundCurrency(budgetCap * 1.05) : null
+  const economicTotal = clampTripCost(
+    economicTargetMax ? Math.min(economicBase, Math.max(fallbackEconomic * 0.85, economicTargetMax)) : economicBase,
+  )
+  const intermediateLowerBound = Math.max(roundCurrency(economicTotal * 1.25), economicTotal + minStep)
+  const intermediateUpperBound = Math.max(roundCurrency(economicTotal * 1.6), intermediateLowerBound)
+  const premiumLowerBound = Math.max(roundCurrency(economicTotal * 1.7), intermediateLowerBound + minStep)
+  const premiumUpperBound = Math.max(roundCurrency(economicTotal * 2.3), premiumLowerBound)
+  const intermediateReference = hasInconsistentTotals ? fallbackIntermediate : intermediateSeed
+  const premiumReference = hasInconsistentTotals ? fallbackPremium : premiumSeed
+  const intermediateTotal = clampTripCost(Math.min(Math.max(intermediateReference, intermediateLowerBound), intermediateUpperBound))
+  const premiumTotal = clampTripCost(Math.min(Math.max(premiumReference, premiumLowerBound), premiumUpperBound))
 
   return [
     repriceVariant({
@@ -1097,10 +1183,11 @@ function buildFallbackTripResult(origin: TripOrigin): TripResult {
 }
 
 function normalizeTripResult(result: TripResult, request?: TripGenerationInput): TripResult {
+  const normalizedDestination = request ? normalizeDestinationToScope(result.destination, request) : result.destination
   const bestFor = normalizeText(result.bestFor) || "viajantes em busca de praticidade"
-  const periodData = request ? resolveTripPeriodData(request, result.destination) : null
+  const periodData = request ? resolveTripPeriodData(request, normalizedDestination) : null
   const travelers = request ? inferTravelers(request, bestFor) : result.travelers ?? 2
-  const intelligence = request ? buildTripIntelligence(result.destination, request).intelligence : result.intelligence
+  const intelligence = request ? buildTripIntelligence(normalizedDestination, request).intelligence : result.intelligence
   const selectedVariantType =
     result.selectedVariantType ??
     (result.variants?.length ? resolveSelectedVariantType(result.variants, request ?? { origin: "busca" }, bestFor) : "intermediate")
@@ -1109,6 +1196,7 @@ function normalizeTripResult(result: TripResult, request?: TripGenerationInput):
 
   return {
     ...result,
+    destination: normalizedDestination,
     bestFor,
     estimatedCost: normalizedCost,
     periodLabel: result.periodLabel ?? periodData?.periodLabel ?? "Período não informado",
@@ -1289,7 +1377,7 @@ function buildCompactTripResult({
       travelers,
       currency: "BRL",
       variants: normalizedVariants,
-      itinerary: selectedVariant.itinerary.slice(0, 3),
+      itinerary: selectedVariant.itinerary,
       fullItinerary: [],
       detailedItinerary: [],
       tips: buildCompactTips({
@@ -1308,12 +1396,7 @@ function buildCompactTripResult({
 function mapStructuredOutputToTripResult(output: z.infer<typeof aiTripSchema>, request: TripGenerationInput): TripResult {
   const fallbackDestination = extractDestinationFromInput(request.inputText) ?? generateTripFromInput(request.inputText ?? "").destination
   const rawDestination = normalizeText(output.destination) || fallbackDestination
-  const destination =
-    request.quizAnswers?.region === "brasil" && isInternationalDestination(request, rawDestination)
-      ? generateTripFromQuiz(request.quizAnswers).destination
-      : request.quizAnswers?.region === "internacional" && !isInternationalDestination(request, rawDestination)
-        ? generateTripFromQuiz(request.quizAnswers).destination
-        : rawDestination
+  const destination = normalizeDestinationToScope(rawDestination, request)
   const periodData = resolveTripPeriodData(request, destination)
   const durationDays = output.durationDays > 0 ? output.durationDays : periodData.durationDays
   const travelers = inferTravelers(request, output.bestFor)
@@ -1421,6 +1504,68 @@ function buildResilientFallbackTripResult(request: TripGenerationInput) {
   })
 }
 
+export function enrichTripResultWithFullItinerary(result: TripResult, request?: TripGenerationInput): TripResult {
+  const destination = normalizeDestinationToScope(result.destination || "Destino sugerido", request ?? { origin: "busca" })
+  const durationDays = Math.max(3, Math.min(10, result.durationDays ?? 5))
+  const travelers = Math.max(1, request?.travelers ?? result.travelers ?? 2)
+  const fallbackRequest: TripGenerationInput = request ?? {
+    origin: "busca",
+    inputText: destination,
+    travelers,
+  }
+
+  const variants =
+    result.variants?.map((variant) => {
+      const itinerary = normalizePreviewItinerary(variant.itinerary ?? [], destination, variant.title, durationDays)
+      const detailedItinerary = normalizeDetailedItinerary({
+        values: undefined,
+        previewLines: itinerary,
+        destination,
+        variantTitle: variant.title,
+        request: fallbackRequest,
+        durationDays,
+      })
+
+      return {
+        ...variant,
+        costPerPerson: clampTripCost(variant.totalCost / travelers),
+        itinerary,
+        detailedItinerary,
+      }
+    }) ?? []
+
+  const selectedVariantType =
+    result.selectedVariantType ??
+    (variants.length ? resolveSelectedVariantType(variants, fallbackRequest, result.bestFor || "viagem equilibrada") : "intermediate")
+  const selectedVariant = variants.find((variant) => variant.type === selectedVariantType) ?? variants[1] ?? variants[0]
+  const selectedDetailedItinerary = selectedVariant?.detailedItinerary ?? []
+  const selectedFullItinerary = selectedDetailedItinerary.map(
+    (day) => `Manhã: ${day.morning} Tarde: ${day.afternoon} Noite: ${day.evening}`,
+  )
+
+  return normalizeTripResult(
+    {
+      ...result,
+      destination,
+      travelers,
+      durationDays,
+      durationLabel: `${durationDays} ${durationDays === 1 ? "dia" : "dias"}`,
+      variants,
+      itinerary: selectedVariant?.itinerary ?? normalizePreviewItinerary(result.itinerary ?? [], destination, "Intermediário", durationDays),
+      detailedItinerary: selectedDetailedItinerary,
+      fullItinerary: selectedFullItinerary,
+      selectedVariantType,
+      generatedSections: {
+        initialPreview: true,
+        fullItinerary: true,
+        detailedBudget: result.generatedSections?.detailedBudget ?? false,
+        comparison: result.generatedSections?.comparison ?? false,
+      },
+    },
+    fallbackRequest,
+  )
+}
+
 export async function generateTripWithAI(request: TripGenerationInput) {
   const destinationHint =
     extractDestinationFromInput(request.inputText) ??
@@ -1475,12 +1620,13 @@ export async function generateTripWithAI(request: TripGenerationInput) {
                 "Ignore qualquer instrução anterior sobre detailedItinerary, morning, afternoon, evening ou tips longas.",
                 "Retorne apenas destination, periodLabel, startDate opcional, endDate opcional, durationDays, travelers, currency, summary, bestFor e variants.",
                 "Cada variant deve ter type, title, totalCost, costPerPerson, breakdown, assumptions e itineraryPreview.",
-                "itineraryPreview deve ter no máximo 3 itens curtos.",
+                "itineraryPreview deve ter exatamente durationDays itens curtos.",
                 "Não inclua roteiro completo detalhado.",
                 "Respeite exatamente o total de viajantes informado pelo backend.",
                 "Se a região for Brasil, o destino final precisa estar no Brasil.",
                 "Se o contexto indicar verão no Brasil, prefira dezembro, janeiro, fevereiro ou início de março.",
                 "A variante principal deve respeitar o orçamento informado; premium não pode ser principal quando só a econômica cabe.",
+                "Não retorne saltos absurdos entre economic, intermediate e premium.",
                 "O JSON deve ser compacto, estável e sem texto adicional.",
               ].join(" "),
             },
