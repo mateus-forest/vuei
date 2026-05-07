@@ -3,6 +3,7 @@ import type { AppSession } from "@/types/session"
 import type { User } from "@/types/user"
 import { mockUsers } from "@/lib/mocks/users"
 import { INITIAL_BONUS_CREDITS } from "@/lib/services/credit-service"
+import { ensureSignupBonusTransaction } from "@/lib/services/credit-transaction-service"
 import { createSupabaseAdminClient } from "@/lib/supabase/server"
 
 function mapProfileToUser(profile: Partial<ProfileRow> & Pick<ProfileRow, "id" | "email">): User {
@@ -81,6 +82,16 @@ async function ensureProfileForSession(session: AppSession, allowBootstrap = tru
         details: upsertError?.details,
       })
       return buildFallbackProfile(session)
+    }
+
+    const signupBonusTransaction = await ensureSignupBonusTransaction({
+      supabase: adminClient,
+      userId: session.userId,
+      email: session.email,
+    })
+
+    if (signupBonusTransaction.error) {
+      console.error("BONUS SIGNUP TRANSACTION ERROR:", signupBonusTransaction.error)
     }
 
     return createdProfile as ProfileRow

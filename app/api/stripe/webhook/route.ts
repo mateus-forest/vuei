@@ -1,6 +1,7 @@
 import { randomUUID } from "crypto"
 import { NextResponse } from "next/server"
 import Stripe from "stripe"
+import { recordCreditTransaction } from "@/lib/services/credit-transaction-service"
 import { getStripePlanConfig } from "@/lib/services/billing-service"
 import { createSupabaseAdminClient } from "@/lib/supabase/server"
 import { assertStripeWebhookSecret, getStripeServerClient } from "@/lib/stripe/server"
@@ -206,14 +207,14 @@ export async function POST(request: Request) {
     return jsonError("Failed to update profile credits.", 500)
   }
 
-  const { error: transactionInsertError } = await supabase.from("credit_transactions").insert({
-    id: randomUUID(),
-    user_id: resolvedUserId,
+  const { error: transactionInsertError } = await recordCreditTransaction({
+    supabase,
+    userId: resolvedUserId,
     email,
     type: "purchase",
     credits,
-    description: eventMarker,
-    payment_id: paymentId,
+    description: `Compra de ${credits} crédito${credits === 1 ? "" : "s"} via Stripe`,
+    paymentId,
   })
 
   if (transactionInsertError) {

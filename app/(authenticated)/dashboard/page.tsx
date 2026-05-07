@@ -6,8 +6,10 @@ import { SiteFooter } from "@/components/landing/site-footer"
 import { BrandBadge } from "@/components/ui/brand-badge"
 import { PageIntro } from "@/components/ui/page-intro"
 import { SectionShell } from "@/components/ui/section-shell"
+import { getUserCreditHistory } from "@/lib/services/credit-transaction-service"
 import { listUserTravelHistory } from "@/lib/services/search-service"
 import { getServerSession } from "@/lib/services/server-session-service"
+import { createSupabaseAdminClient } from "@/lib/supabase/server"
 import { getCurrentUser } from "@/lib/services/user-service"
 
 export default async function DashboardPage() {
@@ -22,10 +24,22 @@ export default async function DashboardPage() {
   }
 
   const searches = await listUserTravelHistory(user.id)
+  const creditHistory =
+    (await getUserCreditHistory({
+      supabase: createSupabaseAdminClient(),
+      userId: user.id,
+      limit: 50,
+    })) ?? {
+      currentBalance: user.credits,
+      totalGained: 0,
+      totalSpent: 0,
+      countsByType: {},
+      transactions: [],
+    }
 
   return (
     <main className="min-h-screen">
-      <DashboardHeader user={user} searches={searches} />
+      <DashboardHeader user={user} searches={searches} creditHistory={creditHistory} />
       <SectionShell className="pt-12">
         <div className="space-y-10">
           <PageIntro

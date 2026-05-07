@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server"
-import { randomUUID } from "crypto"
 import { CREDITS_PER_GENERATED_TRIP } from "@/lib/services/credit-service"
+import { recordCreditTransaction } from "@/lib/services/credit-transaction-service"
 import { getServerSession } from "@/lib/services/server-session-service"
 import { enrichTripResultWithFullItinerary } from "@/lib/services/trip-service"
 import { createSupabaseAdminClient } from "@/lib/supabase/server"
@@ -74,8 +74,6 @@ export async function POST(_: Request, context: { params: Promise<{ tripId: stri
   const enrichedResult = enrichTripResultWithFullItinerary(rawResult, buildRequestFromSearch(searchRow as SearchRow, rawResult))
   const now = new Date().toISOString()
   const newCreditsBalance = availableCredits - CREDITS_PER_GENERATED_TRIP
-  const transactionDescription = `full_itinerary:${tripId}`
-
   const { data: updatedProfile, error: profileUpdateError } = await supabase
     .from("profiles")
     .update({
@@ -91,15 +89,14 @@ export async function POST(_: Request, context: { params: Promise<{ tripId: stri
     return NextResponse.json({ ok: false, error: "Seu saldo foi atualizado. Tente novamente." }, { status: 409 })
   }
 
-  const { error: transactionError } = await supabase.from("credit_transactions").insert({
-    id: randomUUID(),
-    user_id: session.userId,
+  const { error: transactionError } = await recordCreditTransaction({
+    supabase,
+    userId: session.userId,
     email: profile.email ?? session.email ?? null,
-    type: "usage",
+    type: "full_itinerary",
     credits: -CREDITS_PER_GENERATED_TRIP,
-    description: transactionDescription,
-    payment_id: null,
-    created_at: now,
+    description: "Roteiro completo gerado",
+    createdAt: now,
   })
 
   if (transactionError) {
@@ -146,7 +143,8 @@ export async function POST(_: Request, context: { params: Promise<{ tripId: stri
       .from("credit_transactions")
       .delete()
       .eq("user_id", session.userId)
-      .eq("description", transactionDescription)
+      .eq("description", "Roteiro completo gerado")
+      .eq("created_at", now)
 
     return NextResponse.json({ ok: false, error: "Não foi possível salvar o roteiro completo." }, { status: 500 })
   }

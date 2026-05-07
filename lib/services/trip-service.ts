@@ -4,6 +4,7 @@ import { zodTextFormat } from "openai/helpers/zod"
 import { defaultTripResult, quizResultMap, tripCatalog } from "@/lib/mocks/trips"
 import { getOpenAIServerClient } from "@/lib/openai/server"
 import { CREDITS_PER_GENERATED_TRIP } from "@/lib/services/credit-service"
+import { recordCreditTransaction } from "@/lib/services/credit-transaction-service"
 import { getCurrentUser } from "@/lib/services/user-service"
 import { createSupabaseAdminClient } from "@/lib/supabase/server"
 import { buildTripIntelligence } from "@/lib/travel/travel-intelligence"
@@ -1739,7 +1740,6 @@ export async function generateAndPersistTrip({
     const now = new Date().toISOString()
     const searchId = randomUUID()
     const inputOriginal = buildInputLabel(request)
-    const transactionDescription = `trip_usage:${searchId}`
     const { data: latestProfile, error: latestProfileError } = await supabase
       .from("profiles")
       .select("id,email,credits")
@@ -1866,15 +1866,14 @@ export async function generateAndPersistTrip({
 
       updatedProfileCredits = typeof updatedProfile.credits === "number" ? updatedProfile.credits : newCreditsBalance
 
-      const { error: transactionError } = await supabase.from("credit_transactions").insert({
-        id: randomUUID(),
-        user_id: user.id,
+      const { error: transactionError } = await recordCreditTransaction({
+        supabase,
+        userId: user.id,
         email: user.email,
-        type: "usage",
+        type: "trip_generation",
         credits: -CREDITS_PER_GENERATED_TRIP,
-        description: transactionDescription,
-        payment_id: null,
-        created_at: now,
+        description: "Nova viagem gerada",
+        createdAt: now,
       })
 
       if (transactionError) {
@@ -1939,7 +1938,8 @@ export async function generateAndPersistTrip({
           .from("credit_transactions")
           .delete()
           .eq("user_id", user.id)
-          .eq("description", transactionDescription)
+          .eq("description", "Nova viagem gerada")
+          .eq("created_at", now)
 
         return {
           ok: false as const,

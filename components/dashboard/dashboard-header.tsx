@@ -7,6 +7,7 @@ import { CreditCard, HelpCircle, History, Home, LogOut, Menu, Shield, User, X } 
 import { signOut } from "@/lib/services/session-service"
 import { creditPackages } from "@/lib/constants/credit-packages"
 import { formatShortDate } from "@/lib/utils/format"
+import type { CreditHistorySummary, CreditTransactionEntry } from "@/types/credit"
 import type { Search } from "@/types/search"
 import type { User as DashboardUser } from "@/types/user"
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion"
@@ -14,7 +15,44 @@ import { Avatar, AvatarFallback } from "@/components/ui/avatar"
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
 
-export function DashboardHeader({ user, searches = [] }: { user: DashboardUser; searches?: Search[] }) {
+function getCreditTypeLabel(type: CreditTransactionEntry["type"]) {
+  switch (type) {
+    case "bonus_signup":
+      return "Crédito bônus de cadastro"
+    case "purchase":
+      return "Créditos comprados"
+    case "trip_generation":
+      return "Nova viagem gerada"
+    case "full_itinerary":
+      return "Roteiro completo gerado"
+    case "trip_adjustment":
+      return "Ajuste de viagem"
+    case "destination_comparison":
+      return "Comparação de destino"
+    case "detailed_budget":
+      return "Orçamento detalhado"
+    case "refund":
+      return "Estorno de créditos"
+    case "system":
+      return "Ajuste de sistema"
+    default:
+      return "Movimentação de créditos"
+  }
+}
+
+function formatCreditDelta(value: number) {
+  return `${value > 0 ? "+" : ""}${value}`
+}
+
+export function DashboardHeader({
+  user,
+  searches = [],
+  creditHistory,
+}: {
+  user: DashboardUser
+  searches?: Search[]
+  creditHistory: CreditHistorySummary
+}) {
   const [isTripsOpen, setIsTripsOpen] = useState(false)
   const [isCreditsOpen, setIsCreditsOpen] = useState(false)
   const [isHelpOpen, setIsHelpOpen] = useState(false)
@@ -285,7 +323,7 @@ export function DashboardHeader({ user, searches = [] }: { user: DashboardUser; 
 
             <div className="mt-6 rounded-2xl border border-border/60 bg-secondary/35 px-4 py-4">
               <div className="text-sm text-muted-foreground">Créditos disponíveis</div>
-              <div className="mt-2 text-2xl font-semibold text-foreground">{user.credits}</div>
+              <div className="mt-2 text-2xl font-semibold text-foreground">{creditHistory.currentBalance}</div>
             </div>
 
             <p className="mt-5 text-sm leading-6 text-muted-foreground">
@@ -313,6 +351,52 @@ export function DashboardHeader({ user, searches = [] }: { user: DashboardUser; 
               ))}
             </div>
             {creditsError ? <p className="mt-4 text-sm text-[#004aad]">{creditsError}</p> : null}
+
+            <div className="mt-8">
+              <div className="mb-3 text-lg font-semibold text-foreground">Histórico de créditos</div>
+              <div className="grid gap-3 sm:grid-cols-3">
+                <div className="rounded-2xl border border-border/60 bg-white/80 px-4 py-4">
+                  <div className="text-sm text-muted-foreground">Saldo atual</div>
+                  <div className="mt-2 text-xl font-semibold text-foreground">{creditHistory.currentBalance}</div>
+                </div>
+                <div className="rounded-2xl border border-border/60 bg-white/80 px-4 py-4">
+                  <div className="text-sm text-muted-foreground">Créditos ganhos</div>
+                  <div className="mt-2 text-xl font-semibold text-emerald-600">+{creditHistory.totalGained}</div>
+                </div>
+                <div className="rounded-2xl border border-border/60 bg-white/80 px-4 py-4">
+                  <div className="text-sm text-muted-foreground">Créditos usados</div>
+                  <div className="mt-2 text-xl font-semibold text-rose-600">-{creditHistory.totalSpent}</div>
+                </div>
+              </div>
+
+              <div className="mt-4 max-h-[320px] space-y-3 overflow-y-auto pr-1">
+                {creditHistory.transactions.length === 0 ? (
+                  <div className="rounded-2xl border border-border/60 bg-white/80 px-4 py-4 text-sm text-muted-foreground">
+                    Você ainda não possui movimentações de créditos.
+                  </div>
+                ) : (
+                  creditHistory.transactions.map((transaction) => (
+                    <div key={transaction.id} className="flex items-start justify-between gap-4 rounded-2xl border border-border/60 bg-white/80 px-4 py-4">
+                      <div>
+                        <div className="text-sm font-medium text-foreground">
+                          {transaction.description?.trim() || getCreditTypeLabel(transaction.type)}
+                        </div>
+                        <div className="mt-1 text-xs text-muted-foreground">
+                          {getCreditTypeLabel(transaction.type)} • {formatShortDate(transaction.createdAt)}
+                        </div>
+                      </div>
+                      <div
+                        className={`text-sm font-semibold ${
+                          transaction.credits > 0 ? "text-emerald-600" : "text-rose-600"
+                        }`}
+                      >
+                        {formatCreditDelta(transaction.credits)}
+                      </div>
+                    </div>
+                  ))
+                )}
+              </div>
+            </div>
           </div>
         </DialogContent>
       </Dialog>

@@ -44,7 +44,16 @@ export type CreditTransactionRow = {
   id: string
   user_id: string
   email: string | null
-  type: "purchase" | "usage" | "manual"
+  type:
+    | "bonus_signup"
+    | "purchase"
+    | "trip_generation"
+    | "full_itinerary"
+    | "trip_adjustment"
+    | "destination_comparison"
+    | "detailed_budget"
+    | "refund"
+    | "system"
   credits: number
   description: string | null
   payment_id: string | null

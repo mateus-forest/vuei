@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server"
 import { z } from "zod"
+import { recordCreditTransaction } from "@/lib/services/credit-transaction-service"
 import { getServerSession } from "@/lib/services/server-session-service"
 import { createSupabaseAdminClient } from "@/lib/supabase/server"
 
@@ -72,22 +73,17 @@ export async function POST(request: Request) {
     return jsonError("Não foi possível adicionar créditos agora.", 500)
   }
 
-  const { error: transactionError } = await supabase.from("credit_transactions").insert({
-    user_id: userId,
+  const { error: transactionError } = await recordCreditTransaction({
+    supabase,
+    userId,
     email: targetProfile.email,
-    type: "manual",
+    type: "system",
     credits,
-    description: "Créditos adicionados manualmente pelo admin",
-    payment_id: null,
+    description: "Ajuste manual de créditos pelo admin",
   })
 
   if (transactionError) {
-    console.error("ADMIN ADD CREDITS TRANSACTION ERROR", {
-      message: transactionError.message,
-      code: transactionError.code,
-      details: transactionError.details,
-      hint: transactionError.hint,
-    })
+    console.error("ADMIN ADD CREDITS TRANSACTION ERROR", transactionError)
   }
 
   return jsonOk({ userId, credits: nextCredits })

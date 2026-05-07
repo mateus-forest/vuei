@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server"
 import { INITIAL_BONUS_CREDITS } from "@/lib/services/credit-service"
+import { ensureSignupBonusTransaction } from "@/lib/services/credit-transaction-service"
 import { createSupabaseAdminClient, createSupabaseServerClient } from "@/lib/supabase/server"
 
 type BootstrapProfilePayload = {
@@ -60,6 +61,16 @@ export async function POST(request: Request) {
         },
         { status: 500 },
       )
+    }
+
+    const signupBonusTransaction = await ensureSignupBonusTransaction({
+      supabase,
+      userId: user.id,
+      email: user.email ?? "",
+    })
+
+    if (signupBonusTransaction.error) {
+      console.error("BONUS SIGNUP TRANSACTION ERROR:", signupBonusTransaction.error)
     }
 
     return NextResponse.json({ ok: true, data: { profileId: data.id } })

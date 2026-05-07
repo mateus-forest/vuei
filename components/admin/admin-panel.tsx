@@ -88,7 +88,7 @@ export function AdminPanel({
 
     const estimatedRevenue = purchases.reduce((accumulator, purchase) => accumulator + parseCurrency(purchase.value), 0)
     const consumedCredits = creditTransactions
-      .filter((transaction) => transaction.type === "usage")
+      .filter((transaction) => transaction.credits < 0)
       .reduce((accumulator, transaction) => accumulator + Math.abs(transaction.credits), 0)
 
     return {
