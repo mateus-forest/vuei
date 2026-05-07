@@ -1,3 +1,4 @@
+import { Suspense } from "react"
 import { UserPlus2 } from "lucide-react"
 import { SiteFooter } from "@/components/landing/site-footer"
 import { SiteHeader } from "@/components/landing/site-header"
@@ -22,7 +23,9 @@ export default function SignupPage() {
             title="Crie sua conta e transforme a busca em histórico."
             description="Uma extensão natural da home para quem quer continuar ajustando viagens, salvar resultados e usar créditos."
           />
-          <AuthForm mode="signup" />
+          <Suspense fallback={null}>
+            <AuthForm mode="signup" />
+          </Suspense>
         </div>
       </SectionShell>
       <SiteFooter />

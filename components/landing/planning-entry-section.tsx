@@ -90,10 +90,10 @@ export function PlanningEntrySection() {
 
         <div className="mt-6">
           <div className={activeEntry === "search" ? "block" : "hidden"} aria-hidden={activeEntry !== "search"}>
-            <AiTripForm requireAuthBeforeSubmit />
+            <AiTripForm enforceFreeSearchLimit />
           </div>
           <div className={activeEntry === "quiz" ? "block" : "hidden"} aria-hidden={activeEntry !== "quiz"}>
-            <QuizForm requireAuthBeforeSubmit />
+            <QuizForm enforceFreeSearchLimit />
           </div>
         </div>
       </div>

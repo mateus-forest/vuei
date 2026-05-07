@@ -1,3 +1,4 @@
+import { Suspense } from "react"
 import { LockKeyhole } from "lucide-react"
 import { SiteFooter } from "@/components/landing/site-footer"
 import { SiteHeader } from "@/components/landing/site-header"
@@ -22,7 +23,9 @@ export default function LoginPage() {
             title="Entre para continuar sua descoberta."
             description="A tela de acesso segue a mesma leitura clara da landing: foco no próximo passo, poucos elementos e CTA direto."
           />
-          <AuthForm mode="login" />
+          <Suspense fallback={null}>
+            <AuthForm mode="login" />
+          </Suspense>
         </div>
       </SectionShell>
       <SiteFooter />

@@ -1,6 +1,7 @@
 ﻿"use client"
 
 import Link from "next/link"
+import { usePathname, useSearchParams } from "next/navigation"
 import { type ReactNode, useMemo, useRef, useState } from "react"
 import { ArrowLeftRight, Compass, CreditCard, Download, Map, Sparkles, Wallet } from "lucide-react"
 import { ItineraryPdfTemplate } from "@/components/trip/itinerary-pdf-template"
@@ -15,6 +16,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog"
+import { savePostAuthRedirect } from "@/lib/services/post-auth-redirect-service"
 import type { TripItineraryDay, TripResult } from "@/types/trip"
 import { cn } from "@/lib/utils"
 
@@ -673,6 +675,12 @@ export function ResultView({
     period: "Julho",
   })
   const pdfTemplateRef = useRef<HTMLDivElement>(null)
+  const pathname = usePathname()
+  const searchParams = useSearchParams()
+  const currentResultPath = useMemo(() => {
+    const query = searchParams.toString()
+    return query ? `${pathname}?${query}` : pathname
+  }, [pathname, searchParams])
 
   const baseCost = parsePrice(currentResult.estimatedCost)
   const tripVariants = useMemo(() => buildTripVariants(currentResult, baseCost), [currentResult, baseCost])
@@ -1111,15 +1119,21 @@ export function ResultView({
               </div>
 
               <p className="text-sm leading-6 text-muted-foreground">
-                Você já viu o valor e a direção da viagem. Faça login para salvar o histórico, continuar os ajustes e encontrar sua viagem ideal de forma rápida com o VUEI.
+                Você já viu o destino, o período e a faixa de preço. Crie sua conta para salvar esta viagem, receber 1 crédito bônus e continuar explorando roteiros e novos ajustes no VUEI.
               </p>
 
               <div className="mt-5 grid gap-3">
-                <GradientButton href="/login" size="lg" className="w-full">
+                <GradientButton
+                  href={`/login?next=${encodeURIComponent(currentResultPath)}`}
+                  size="lg"
+                  className="w-full"
+                  onClick={() => savePostAuthRedirect(currentResultPath)}
+                >
                   Entrar para continuar
                 </GradientButton>
                 <Link
-                  href="/cadastro"
+                  href={`/cadastro?next=${encodeURIComponent(currentResultPath)}`}
+                  onClick={() => savePostAuthRedirect(currentResultPath)}
                   className="inline-flex items-center justify-center rounded-2xl border border-border/60 bg-white/80 px-4 py-3 text-sm font-medium text-foreground transition hover:border-[#5de0e6]/60"
                 >
                   Criar conta

@@ -5,6 +5,7 @@ import { useEffect, useMemo, useState, useTransition } from "react"
 import { useRouter } from "next/navigation"
 import { ArrowRight, Plane, Sparkles } from "lucide-react"
 import { heroSuggestions } from "@/lib/constants/trip-suggestions"
+import { hasUsedGuestTrip, markGuestTripUsed } from "@/lib/services/guest-trip-service"
 import { savePendingTripRequest } from "@/lib/services/pending-trip-service"
 import { getClientSession } from "@/lib/services/session-service"
 import { sanitizeTripProfileInput } from "@/lib/travel/trip-profile"
@@ -32,7 +33,6 @@ type TripGenerationApiResponse =
   | { ok: true; data: { persisted: boolean; tripId?: string; remainingCredits?: number; result?: unknown } }
   | { ok: false; error: string; code?: string }
 
-const FREE_SEARCH_STORAGE_KEY = "free_search_used"
 const emptyProfile: TripProfileInput = { preferences: [] }
 
 const profileOptions = {
@@ -144,7 +144,7 @@ export function AiTripForm({
       return false
     }
 
-    return window.localStorage.getItem(FREE_SEARCH_STORAGE_KEY) === "true"
+    return hasUsedGuestTrip()
   })
   const router = useRouter()
 
@@ -155,7 +155,7 @@ export function AiTripForm({
     if (!enforceFreeSearchLimit || typeof window === "undefined") return
 
     const syncFreeSearchStatus = () => {
-      setFreeSearchBlocked(window.localStorage.getItem(FREE_SEARCH_STORAGE_KEY) === "true")
+      setFreeSearchBlocked(hasUsedGuestTrip())
     }
 
     window.addEventListener("storage", syncFreeSearchStatus)
@@ -218,8 +218,8 @@ export function AiTripForm({
         return
       }
 
-      if (!session.isAuthenticated && enforceFreeSearchLimit && typeof window !== "undefined") {
-        window.localStorage.setItem(FREE_SEARCH_STORAGE_KEY, "true")
+      if (!session.isAuthenticated && enforceFreeSearchLimit) {
+        markGuestTripUsed()
         setFreeSearchBlocked(true)
       }
 

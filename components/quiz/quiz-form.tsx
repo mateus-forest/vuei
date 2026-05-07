@@ -1,8 +1,10 @@
 "use client"
 
-import { useState, useTransition } from "react"
+import Link from "next/link"
+import { useEffect, useState, useTransition } from "react"
 import { useRouter } from "next/navigation"
 import { ArrowRight, Sparkles } from "lucide-react"
+import { hasUsedGuestTrip, markGuestTripUsed } from "@/lib/services/guest-trip-service"
 import { savePendingTripRequest } from "@/lib/services/pending-trip-service"
 import { getClientSession } from "@/lib/services/session-service"
 import { GradientButton } from "@/components/ui/gradient-button"
@@ -77,9 +79,11 @@ async function readJsonResponse(response: Response) {
 
 export function QuizForm({
   redirectTo = "/resultado",
+  enforceFreeSearchLimit = false,
   requireAuthBeforeSubmit = false,
 }: {
   redirectTo?: string
+  enforceFreeSearchLimit?: boolean
   requireAuthBeforeSubmit?: boolean
 }) {
   const [answers, setAnswers] = useState<QuizAnswer>(defaultAnswers)
@@ -87,7 +91,28 @@ export function QuizForm({
   const [error, setError] = useState("")
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [isPending, startTransition] = useTransition()
+  const [freeSearchBlocked, setFreeSearchBlocked] = useState(() => {
+    if (!enforceFreeSearchLimit || typeof window === "undefined") {
+      return false
+    }
+
+    return hasUsedGuestTrip()
+  })
   const router = useRouter()
+
+  useEffect(() => {
+    if (!enforceFreeSearchLimit || typeof window === "undefined") return
+
+    const syncFreeSearchStatus = () => {
+      setFreeSearchBlocked(hasUsedGuestTrip())
+    }
+
+    window.addEventListener("storage", syncFreeSearchStatus)
+
+    return () => {
+      window.removeEventListener("storage", syncFreeSearchStatus)
+    }
+  }, [enforceFreeSearchLimit])
 
   function updateAnswer<K extends keyof QuizAnswer>(key: K, value: QuizAnswer[K]) {
     setAnswers((current) => ({ ...current, [key]: value }))
@@ -98,6 +123,12 @@ export function QuizForm({
     setError("")
     const payload = new URLSearchParams(answers).toString()
     const session = await getClientSession()
+
+    if (!session.isAuthenticated && enforceFreeSearchLimit && freeSearchBlocked) {
+      setError("Você já usou sua busca gratuita. Crie uma conta para continuar.")
+      setIsSubmitting(false)
+      return
+    }
 
     if (!session.isAuthenticated && requireAuthBeforeSubmit) {
       savePendingTripRequest({
@@ -131,6 +162,11 @@ export function QuizForm({
         const message = result && !result.ok ? result.error : "Não foi possível gerar sua viagem agora. Tente novamente em instantes."
         setError(message)
         return
+      }
+
+      if (!session.isAuthenticated && enforceFreeSearchLimit) {
+        markGuestTripUsed()
+        setFreeSearchBlocked(true)
       }
 
       if (result.data.tripId) {
@@ -220,6 +256,20 @@ export function QuizForm({
         </GradientButton>
 
         {error ? <p className="text-sm text-[#004aad]">{error}</p> : null}
+
+        {enforceFreeSearchLimit && freeSearchBlocked ? (
+          <div className="flex flex-wrap gap-3">
+            <GradientButton href="/cadastro" size="lg">
+              Criar conta
+            </GradientButton>
+            <Link
+              href="/login"
+              className="inline-flex items-center justify-center rounded-2xl border border-border/60 bg-white/80 px-4 py-3 text-sm font-medium text-foreground transition hover:border-[#5de0e6]/60"
+            >
+              Entrar
+            </Link>
+          </div>
+        ) : null}
       </div>
     </BrandCard>
   )

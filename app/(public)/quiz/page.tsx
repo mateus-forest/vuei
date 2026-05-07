@@ -25,7 +25,7 @@ export default async function QuizPage() {
             title="Descubra um destino sem perder tempo."
             description="O quiz continua a experiência da landing com o mesmo tom: poucas escolhas, leitura fácil e uma sugestão simulada no final."
           />
-          <QuizForm redirectTo="/resultado" requireAuthBeforeSubmit />
+          <QuizForm redirectTo="/resultado" enforceFreeSearchLimit />
         </div>
       </SectionShell>
       <SiteFooter />

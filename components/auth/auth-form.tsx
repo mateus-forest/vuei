@@ -1,12 +1,14 @@
 "use client"
 
 import Link from "next/link"
+import { useSearchParams } from "next/navigation"
 import { useState } from "react"
 import { ArrowRight, LockKeyhole, Mail, User2 } from "lucide-react"
 import { BrandCard } from "@/components/ui/brand-card"
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { GradientButton } from "@/components/ui/gradient-button"
 import { clearPendingTripRequest, readPendingTripRequest } from "@/lib/services/pending-trip-service"
+import { clearPostAuthRedirect, readPostAuthRedirect } from "@/lib/services/post-auth-redirect-service"
 import { sendPasswordReset, signInWithPassword, signUpWithPassword } from "@/lib/services/session-service"
 
 type BootstrapProfileResponse =
@@ -19,6 +21,7 @@ type TripGenerationApiResponse =
 
 export function AuthForm({ mode }: { mode: "login" | "signup" }) {
   const isLogin = mode === "login"
+  const searchParams = useSearchParams()
   const [form, setForm] = useState({ name: "", email: "", password: "" })
   const [isForgotPasswordOpen, setIsForgotPasswordOpen] = useState(false)
   const [recoveryEmail, setRecoveryEmail] = useState("")
@@ -66,6 +69,18 @@ export function AuthForm({ mode }: { mode: "login" | "signup" }) {
   }
 
   async function resolvePostAuthDestination(userId: string, userEmail: string | null | undefined) {
+    const nextFromQuery = searchParams.get("next")
+    const storedDestination = readPostAuthRedirect()
+
+    if (nextFromQuery?.startsWith("/") && !nextFromQuery.startsWith("//")) {
+      return nextFromQuery
+    }
+
+    if (storedDestination) {
+      clearPostAuthRedirect()
+      return storedDestination
+    }
+
     const authUser = { id: userId, email: userEmail ?? null }
 
     console.log("AUTH USER:", authUser)
@@ -332,7 +347,14 @@ export function AuthForm({ mode }: { mode: "login" | "signup" }) {
 
         <p className="mt-6 text-sm text-muted-foreground">
           {isLogin ? "Ainda não tem conta?" : "Já tem conta?"}{" "}
-          <Link href={isLogin ? "/cadastro" : "/login"} className="font-medium text-[#004aad] transition hover:opacity-80">
+          <Link
+            href={
+              isLogin
+                ? `/cadastro${searchParams.get("next") ? `?next=${encodeURIComponent(searchParams.get("next") ?? "")}` : ""}`
+                : `/login${searchParams.get("next") ? `?next=${encodeURIComponent(searchParams.get("next") ?? "")}` : ""}`
+            }
+            className="font-medium text-[#004aad] transition hover:opacity-80"
+          >
             {isLogin ? "Criar agora" : "Entrar"}
           </Link>
         </p>
