@@ -289,7 +289,7 @@ export function DashboardHeader({ user, searches = [] }: { user: DashboardUser; 
             </div>
 
             <p className="mt-5 text-sm leading-6 text-muted-foreground">
-              Cada viagem gerada consome 1 crédito. O roteiro completo e o download em PDF não consomem créditos.
+              Você recebe 1 resultado inicial grátis na landing. Depois de entrar, novas buscas, novos quizzes, ajustes relevantes, orçamento detalhado, comparação de destinos e roteiro completo consomem 1 crédito cada. Abrir viagens salvas e baixar conteúdos já gerados não consome créditos.
             </p>
 
             <div className="mt-5 space-y-3">
@@ -341,7 +341,7 @@ export function DashboardHeader({ user, searches = [] }: { user: DashboardUser; 
                 <AccordionItem value="help-2">
                   <AccordionTrigger className="text-foreground hover:no-underline">Como os créditos são consumidos?</AccordionTrigger>
                   <AccordionContent className="leading-6 text-muted-foreground">
-                    Cada viagem gerada consome 1 crédito. O roteiro completo e o download em PDF não consomem créditos.
+                    Após o resultado inicial grátis, cada nova busca, quiz, ajuste, orçamento detalhado, comparação ou roteiro completo consome 1 crédito. Abrir viagens salvas e baixar conteúdos já gerados não consome créditos.
                   </AccordionContent>
                 </AccordionItem>
                 <AccordionItem value="help-3">

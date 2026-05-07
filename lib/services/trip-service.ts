@@ -44,8 +44,8 @@ const aiVariantSchema = z.object({
   totalCost: z.number().positive(),
   costPerPerson: z.number().positive(),
   breakdown: aiBreakdownSchema,
-  assumptions: z.string().min(20).max(320),
-  detailedItinerary: z.array(aiItineraryDaySchema).min(3).max(10),
+  assumptions: z.string().min(12).max(180),
+  itineraryPreview: z.array(z.string().min(8).max(90)).min(2).max(3),
 })
 
 const aiTripSchema = z.object({
@@ -56,9 +56,8 @@ const aiTripSchema = z.object({
   durationDays: z.number().int().positive(),
   travelers: z.number().int().positive(),
   currency: z.literal("BRL"),
-  summary: z.string().min(30).max(280),
+  summary: z.string().min(18).max(180),
   bestFor: z.string().min(3).max(120),
-  tips: z.array(z.string().min(8).max(140)).min(3).max(6),
   variants: z.array(aiVariantSchema).length(3),
 })
 
@@ -99,6 +98,7 @@ type SeasonalVariantPricing = {
 }
 
 type AIParseErrorCode = "AI_JSON_INVALID" | "AI_JSON_NOT_FOUND" | "AI_SCHEMA_INVALID"
+const AI_FALLBACK_CONTEXT = "Estimativa inicial gerada com base nas informações disponíveis."
 
 function createAIParseError(code: AIParseErrorCode, message: string, detail?: string) {
   const error = new Error(message)
@@ -705,12 +705,14 @@ function fallbackItineraryDay({
 
 function normalizeDetailedItinerary({
   values,
+  previewLines,
   destination,
   variantTitle,
   request,
   durationDays,
 }: {
   values: Array<z.infer<typeof aiItineraryDaySchema>> | undefined
+  previewLines?: string[]
   destination: string
   variantTitle: string
   request: TripGenerationInput
@@ -729,6 +731,28 @@ function normalizeDetailedItinerary({
     }))
   }
 
+  if (previewLines?.length) {
+    return Array.from({ length: totalDays }, (_, index) => {
+      const fallbackDay = fallbackItineraryDay({
+        day: index + 1,
+        destination,
+        variantTitle,
+        request,
+      })
+      const previewLine = normalizeText(previewLines[index % previewLines.length])
+      const cleanedTitle = previewLine.replace(/^Dia\s+\d+:\s*/i, "").trim()
+
+      return {
+        ...fallbackDay,
+        title: cleanedTitle || fallbackDay.title,
+        afternoon:
+          previewLine && !fallbackDay.afternoon.toLowerCase().includes(previewLine.toLowerCase())
+            ? `${previewLine}. ${fallbackDay.afternoon}`.trim()
+            : fallbackDay.afternoon,
+      }
+    })
+  }
+
   return Array.from({ length: totalDays }, (_, index) =>
     fallbackItineraryDay({
       day: index + 1,
@@ -741,7 +765,7 @@ function normalizeDetailedItinerary({
 
 function normalizeItinerary(values: string[], destination: string, variantTitle: string) {
   if (values.length >= 3) {
-    return values.map((value, index) => {
+    return values.slice(0, 3).map((value, index) => {
       const normalized = normalizeText(value)
       return normalized.startsWith("Dia") ? normalized : `Dia ${index + 1}: ${normalized}`
     })
@@ -825,14 +849,16 @@ function normalizeVariant({
     normalizeText(variant?.assumptions) ||
     buildAssumptions({ destination, variantTitle: titleByType[expectedType], travelers, durationDays, request })
   const assumptions = assumptionsBase.includes(pricing.message) ? assumptionsBase : `${assumptionsBase} ${pricing.message}`.trim()
+  const itineraryPreview = normalizeItinerary(variant?.itineraryPreview ?? [], destination, titleByType[expectedType])
   const detailedItinerary = normalizeDetailedItinerary({
-    values: variant?.detailedItinerary,
+    values: undefined,
+    previewLines: itineraryPreview,
     destination,
     variantTitle: titleByType[expectedType],
     request,
     durationDays,
   })
-  const itinerary = detailedItinerary.map((day, index) => compactItineraryLine(day.title, index))
+  const itinerary = itineraryPreview.length ? itineraryPreview : detailedItinerary.map((day, index) => compactItineraryLine(day.title, index)).slice(0, 3)
 
   return {
     type: expectedType,
@@ -1099,65 +1125,97 @@ function buildUserPrompt(request: TripGenerationInput) {
   ].join("\n")
 }
 
-function mapStructuredOutputToTripResult(output: z.infer<typeof aiTripSchema>, request: TripGenerationInput): TripResult {
-  const fallbackDestination = extractDestinationFromInput(request.inputText) ?? generateTripFromInput(request.inputText ?? "").destination
-  const destination = normalizeText(output.destination) || fallbackDestination
-  const periodData = resolveTripPeriodData(request, destination)
-  const normalizedPeriodLabel = normalizeText(output.periodLabel)
-  const aiReturnedUnknownPeriod = normalizedPeriodLabel.includes("nao informado")
-  const durationDays = output.durationDays > 0 ? output.durationDays : periodData.durationDays
-  const travelers = output.travelers > 0 ? output.travelers : inferTravelers(request, output.bestFor)
+function buildCompactTips({
+  context,
+  intelligenceSummary,
+  periodReason,
+}: {
+  context: string
+  intelligenceSummary?: string
+  periodReason?: string
+}) {
+  return [context, intelligenceSummary, periodReason].map((value) => normalizeText(value)).filter(Boolean).slice(0, 3)
+}
 
+function buildCompactTripResult({
+  request,
+  destination,
+  periodLabel,
+  startDate,
+  endDate,
+  durationDays,
+  travelers,
+  bestFor,
+  summary,
+  context,
+  variants,
+}: {
+  request: TripGenerationInput
+  destination: string
+  periodLabel?: string
+  startDate?: string
+  endDate?: string
+  durationDays: number
+  travelers: number
+  bestFor: string
+  summary: string
+  context: string
+  variants: Array<z.infer<typeof aiVariantSchema> | undefined>
+}) {
+  const periodData = resolveTripPeriodData(request, destination)
+  const normalizedPeriodLabel = normalizeText(periodLabel)
+  const aiReturnedUnknownPeriod = normalizedPeriodLabel.toLowerCase().includes("nao informado")
   const normalizedVariants = ensureVariantOrdering({
     variants: [
       normalizeVariant({
-        variant: output.variants.find((variant) => variant.type === "economic"),
+        variant: variants.find((variant) => variant?.type === "economic"),
         expectedType: "economic",
         request,
         destination,
-        bestFor: output.bestFor,
+        bestFor,
         travelers,
         durationDays,
       }),
       normalizeVariant({
-        variant: output.variants.find((variant) => variant.type === "intermediate"),
+        variant: variants.find((variant) => variant?.type === "intermediate"),
         expectedType: "intermediate",
         request,
         destination,
-        bestFor: output.bestFor,
+        bestFor,
         travelers,
         durationDays,
       }),
       normalizeVariant({
-        variant: output.variants.find((variant) => variant.type === "premium"),
+        variant: variants.find((variant) => variant?.type === "premium"),
         expectedType: "premium",
         request,
         destination,
-        bestFor: output.bestFor,
+        bestFor,
         travelers,
         durationDays,
       }),
     ],
     request,
     destination,
-    bestFor: output.bestFor,
+    bestFor,
     travelers,
     durationDays,
   })
-
   const selectedVariant = normalizedVariants.find((variant) => variant.type === "intermediate") ?? normalizedVariants[1]
+  const intelligenceSummary = buildTripIntelligence(destination, request).intelligence.explanation.summary
+  const safeContext = normalizeText(context) || "Estimativa inicial gerada com base nas informações disponíveis."
 
   return normalizeTripResult(
     {
       destination,
       estimatedCost: formatTripCost(selectedVariant.totalCost),
-      bestFor: normalizeText(output.bestFor) || "viajantes que buscam uma viagem bem planejada",
+      bestFor: normalizeText(bestFor) || "viajantes que buscam uma viagem bem planejada",
       summary:
-        normalizeText(output.summary) ||
-        `Sugestão de viagem para ${destination}, com custos estimados em BRL e variações por perfil, duração e quantidade de pessoas.`,
+        normalizeText(summary) ||
+        `Sugestão inicial para ${destination}, com período recomendado, custos em BRL e comparação clara entre as opções da viagem.`,
       periodLabel: !aiReturnedUnknownPeriod && normalizedPeriodLabel ? normalizedPeriodLabel : periodData.periodLabel,
-      startDate: periodData.startDate ? normalizeText(output.startDate ?? undefined) || periodData.startDate : periodData.startDate,
-      endDate: periodData.endDate ? normalizeText(output.endDate ?? undefined) || periodData.endDate : periodData.endDate,
+      startDate: periodData.startDate ? normalizeText(startDate ?? undefined) || periodData.startDate : periodData.startDate,
+      endDate: periodData.endDate ? normalizeText(endDate ?? undefined) || periodData.endDate : periodData.endDate,
       durationDays,
       durationLabel: `${durationDays} ${durationDays === 1 ? "dia" : "dias"}`,
       isSuggestedPeriod: periodData.isSuggestedPeriod,
@@ -1165,17 +1223,43 @@ function mapStructuredOutputToTripResult(output: z.infer<typeof aiTripSchema>, r
       travelers,
       currency: "BRL",
       variants: normalizedVariants,
-      itinerary: selectedVariant.itinerary,
+      itinerary: selectedVariant.itinerary.slice(0, 3),
       fullItinerary: selectedVariant.detailedItinerary.map(
         (day) => `Manha: ${day.morning} Tarde: ${day.afternoon} Noite: ${day.evening}`,
       ),
       detailedItinerary: selectedVariant.detailedItinerary,
-      tips: output.tips.map((tip) => normalizeText(tip)).filter(Boolean),
-      context: normalizeText(selectedVariant.assumptions),
+      tips: buildCompactTips({
+        context: safeContext,
+        intelligenceSummary,
+        periodReason: periodData.periodReason,
+      }),
+      context: safeContext,
       cheapestAlternative: normalizedVariants[0]?.title ? `${destination} ${normalizedVariants[0].title}` : undefined,
     },
     request,
   )
+}
+
+function mapStructuredOutputToTripResult(output: z.infer<typeof aiTripSchema>, request: TripGenerationInput): TripResult {
+  const fallbackDestination = extractDestinationFromInput(request.inputText) ?? generateTripFromInput(request.inputText ?? "").destination
+  const destination = normalizeText(output.destination) || fallbackDestination
+  const periodData = resolveTripPeriodData(request, destination)
+  const durationDays = output.durationDays > 0 ? output.durationDays : periodData.durationDays
+  const travelers = output.travelers > 0 ? output.travelers : inferTravelers(request, output.bestFor)
+
+  return buildCompactTripResult({
+    request,
+    destination,
+    periodLabel: output.periodLabel,
+    startDate: output.startDate ?? undefined,
+    endDate: output.endDate ?? undefined,
+    durationDays,
+    travelers,
+    bestFor: output.bestFor,
+    summary: output.summary,
+    context: "Estimativa inicial gerada a partir dos dados estruturados do VUEI.",
+    variants: output.variants,
+  })
 }
 
 function resolveAIError(error: unknown) {
@@ -1243,8 +1327,30 @@ export function generateTrip(request: TripGenerationInput): TripGenerationRespon
   }
 }
 
+function buildResilientFallbackTripResult(request: TripGenerationInput) {
+  const generated = generateTrip(request)
+  const baseResult = generated.result
+  const destination = normalizeText(baseResult.destination) || extractDestinationFromInput(request.inputText) || "Destino sugerido"
+  const periodData = resolveTripPeriodData(request, destination)
+  const durationDays = baseResult.durationDays ?? periodData.durationDays
+  const travelers = baseResult.travelers ?? inferTravelers(request, baseResult.bestFor)
+
+  return buildCompactTripResult({
+    request,
+    destination,
+    periodLabel: baseResult.periodLabel ?? periodData.periodLabel,
+    startDate: baseResult.startDate ?? periodData.startDate,
+    endDate: baseResult.endDate ?? periodData.endDate,
+    durationDays,
+    travelers,
+    bestFor: baseResult.bestFor || "viagem equilibrada",
+    summary: baseResult.summary || AI_FALLBACK_CONTEXT,
+    context: AI_FALLBACK_CONTEXT,
+    variants: [],
+  })
+}
+
 export async function generateTripWithAI(request: TripGenerationInput) {
-  const client = getOpenAIServerClient()
   const destinationHint =
     extractDestinationFromInput(request.inputText) ??
     (request.origin === "quiz" && request.quizAnswers ? generateTripFromQuiz(request.quizAnswers).destination : undefined)
@@ -1257,9 +1363,10 @@ export async function generateTripWithAI(request: TripGenerationInput) {
   console.time("openai-call")
 
   try {
+    const client = getOpenAIServerClient()
     const response = await client.responses.create({
       model: "gpt-4.1-mini",
-      max_output_tokens: 1100,
+      max_output_tokens: 650,
       input: [
         {
           role: "system",
@@ -1288,6 +1395,18 @@ export async function generateTripWithAI(request: TripGenerationInput) {
                 "Personalize o roteiro conforme perfil, orcamento, duracao e tipo de viagem. Familia pede atividades leves, aventura pede experiencias ativas e luxo pede enderecos premium.",
                 "Retorne APENAS JSON válido. Não inclua texto antes ou depois. Não use comentários. Garanta que todas as strings estejam corretamente fechadas.",
                 "Mantenha o JSON compacto. Resuma summary, assumptions e tips. Cada campo morning, afternoon e evening deve ter no máximo duas frases curtas.",
+              ].join(" "),
+            },
+            {
+              type: "input_text",
+              text: [
+                "Prioridade máxima: gerar somente a prévia inicial da viagem.",
+                "Ignore qualquer instrução anterior sobre detailedItinerary, morning, afternoon, evening ou tips longas.",
+                "Retorne apenas destination, periodLabel, startDate opcional, endDate opcional, durationDays, travelers, currency, summary, bestFor e variants.",
+                "Cada variant deve ter type, title, totalCost, costPerPerson, breakdown, assumptions e itineraryPreview.",
+                "itineraryPreview deve ter no máximo 3 itens curtos.",
+                "Não inclua roteiro completo detalhado.",
+                "O JSON deve ser compacto, estável e sem texto adicional.",
               ].join(" "),
             },
           ],
@@ -1323,6 +1442,7 @@ ${backendPresentationContext}`,
       elapsedMs: Date.now() - openaiStartedAt,
       responseId: "id" in response ? response.id : undefined,
       rawResponse: rawAIResponse,
+      responseLength: rawAIResponse.length,
     })
 
     if (!rawAIResponse.trim()) {
@@ -1336,8 +1456,9 @@ ${backendPresentationContext}`,
       elapsedMs: Date.now() - openaiStartedAt,
       error,
       rawResponse: rawAIResponse,
+      rawResponseLength: rawAIResponse.length,
     })
-    throw error
+    return buildResilientFallbackTripResult(request)
   } finally {
     console.timeEnd("openai-call")
   }
@@ -1376,24 +1497,6 @@ export async function generateAndPersistTrip({
       status: 402,
       error: "NO_CREDITS",
       message: "Você não tem créditos disponíveis. Compre mais créditos para gerar uma nova viagem.",
-    }
-  }
-
-  let result: TripResult
-
-  try {
-    result = await generateTripWithAI({
-      ...request,
-      userId: session.userId,
-    })
-  } catch (error) {
-    console.error("OpenAI trip generation failed", error)
-    const resolvedError = resolveAIError(error)
-    return {
-      ok: false as const,
-      status: resolvedError.status,
-      error: "AI_UNAVAILABLE",
-      message: resolvedError.message,
     }
   }
 
@@ -1445,6 +1548,55 @@ export async function generateAndPersistTrip({
         status: 402,
         error: "NO_CREDITS",
         message: "Voce nao tem creditos disponiveis. Compre mais creditos para gerar uma nova viagem.",
+      }
+    }
+
+    const result = await generateTripWithAI({
+      ...request,
+      userId: session.userId,
+    })
+    const fallbackUsed = normalizeText(result.context) === AI_FALLBACK_CONTEXT
+
+    if (fallbackUsed) {
+      console.time("save-trip")
+      try {
+        const { error: searchInsertError } = await supabase.from("searches").insert({
+          id: searchId,
+          user_id: user.id,
+          email: user.email,
+          source: buildSearchSource(request, true),
+          prompt: inputOriginal,
+          result,
+          credits_used: 0,
+          created_at: now,
+        })
+
+        if (searchInsertError) {
+          console.error("SAVE GENERATED TRIP ERROR:", {
+            message: searchInsertError?.message,
+            code: searchInsertError?.code,
+            details: searchInsertError?.details,
+            hint: searchInsertError?.hint,
+          })
+
+          return {
+            ok: false as const,
+            status: 500,
+            error: "TRIP_SAVE_FAILED",
+            message: "Nao foi possivel salvar sua viagem. Tente novamente.",
+          }
+        }
+      } finally {
+        console.timeEnd("save-trip")
+      }
+
+      return {
+        ok: true as const,
+        status: 200,
+        tripId: searchId,
+        remainingCredits: availableCredits,
+        result,
+        inputOriginal,
       }
     }
 

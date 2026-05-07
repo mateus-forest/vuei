@@ -1119,7 +1119,7 @@ export function ResultView({
               </div>
 
               <p className="text-sm leading-6 text-muted-foreground">
-                Você já viu o destino, o período e a faixa de preço. Crie sua conta para salvar esta viagem, receber 1 crédito bônus e continuar explorando roteiros e novos ajustes no VUEI.
+                Crie sua conta para continuar explorando, salvar viagens e gerar roteiros completos. Você ainda recebe 1 crédito bônus para seguir usando o VUEI depois do resultado inicial grátis.
               </p>
 
               <div className="mt-5 grid gap-3">
