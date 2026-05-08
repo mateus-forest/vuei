@@ -20,24 +20,57 @@ function getCreditTypeLabel(type: CreditTransactionEntry["type"]) {
     case "bonus_signup":
       return "Crédito bônus de cadastro"
     case "purchase":
-      return "Créditos comprados"
+      return "Créditos adicionados"
     case "trip_generation":
       return "Nova viagem gerada"
     case "full_itinerary":
       return "Roteiro completo gerado"
     case "trip_adjustment":
-      return "Ajuste de viagem"
+      return "Viagem ajustada"
     case "destination_comparison":
       return "Comparação de destino"
     case "detailed_budget":
-      return "Orçamento detalhado"
+      return "Orçamento detalhado gerado"
     case "refund":
-      return "Estorno de créditos"
+      return "Crédito estornado"
     case "system":
-      return "Ajuste de sistema"
+      return "Ajuste de créditos"
     default:
       return "Movimentação de créditos"
   }
+}
+
+function isTechnicalCreditDescription(description: string, type: CreditTransactionEntry["type"]) {
+  const normalized = description.trim().toLowerCase()
+
+  if (!normalized) {
+    return true
+  }
+
+  if (normalized.includes("00000000-0000-0000-0000-000000000000")) {
+    return true
+  }
+
+  const uuidPattern = /[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}/i
+  if (uuidPattern.test(description)) {
+    return true
+  }
+
+  return normalized.startsWith(`${type}:`)
+}
+
+function getCreditTransactionTitle(transaction: CreditTransactionEntry) {
+  const description = transaction.description?.trim() ?? ""
+  if (!description || isTechnicalCreditDescription(description, transaction.type)) {
+    return getCreditTypeLabel(transaction.type)
+  }
+
+  return description
+}
+
+function getCreditTransactionSubtitle(transaction: CreditTransactionEntry) {
+  const prefix = transaction.credits > 0 ? "Entrada de crédito" : "Uso de crédito"
+  return `${prefix} • ${formatShortDate(transaction.createdAt)}`
 }
 
 function formatCreditDelta(value: number) {
@@ -375,16 +408,16 @@ export function DashboardHeader({
                     Você ainda não possui movimentações de créditos.
                   </div>
                 ) : (
-                  creditHistory.transactions.map((transaction) => (
-                    <div key={transaction.id} className="flex items-start justify-between gap-4 rounded-2xl border border-border/60 bg-white/80 px-4 py-4">
-                      <div>
-                        <div className="text-sm font-medium text-foreground">
-                          {transaction.description?.trim() || getCreditTypeLabel(transaction.type)}
+                    creditHistory.transactions.map((transaction) => (
+                      <div key={transaction.id} className="flex items-start justify-between gap-4 rounded-2xl border border-border/60 bg-white/80 px-4 py-4">
+                        <div>
+                          <div className="text-sm font-medium text-foreground">
+                            {getCreditTransactionTitle(transaction)}
+                          </div>
+                          <div className="mt-1 text-xs text-muted-foreground">
+                            {getCreditTransactionSubtitle(transaction)}
+                          </div>
                         </div>
-                        <div className="mt-1 text-xs text-muted-foreground">
-                          {getCreditTypeLabel(transaction.type)} • {formatShortDate(transaction.createdAt)}
-                        </div>
-                      </div>
                       <div
                         className={`text-sm font-semibold ${
                           transaction.credits > 0 ? "text-emerald-600" : "text-rose-600"
