@@ -1,5 +1,6 @@
 import { randomUUID } from "crypto"
 import { INITIAL_BONUS_CREDITS } from "@/lib/services/credit-service"
+import { buildCreditTransactionDescription } from "@/lib/utils/credit-transaction-labels"
 import type { CreditHistorySummary, CreditTransactionEntry, CreditTransactionType } from "@/types/credit"
 import type { CreditTransactionRow, ProfileRow } from "@/types/database"
 
@@ -81,7 +82,7 @@ export async function ensureSignupBonusTransaction({
     email,
     type: "bonus_signup",
     credits: INITIAL_BONUS_CREDITS,
-    description: "Crédito bônus de cadastro",
+    description: buildCreditTransactionDescription({ type: "bonus_signup" }),
     createdAt,
   })
 

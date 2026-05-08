@@ -4,6 +4,7 @@ import { recordCreditTransaction } from "@/lib/services/credit-transaction-servi
 import { getServerSession } from "@/lib/services/server-session-service"
 import { enrichTripResultWithFullItinerary } from "@/lib/services/trip-service"
 import { createSupabaseAdminClient } from "@/lib/supabase/server"
+import { buildCreditTransactionDescription } from "@/lib/utils/credit-transaction-labels"
 import type { SearchRow } from "@/types/database"
 import type { TripGenerationInput, TripResult } from "@/types/trip"
 
@@ -95,7 +96,10 @@ export async function POST(_: Request, context: { params: Promise<{ tripId: stri
     email: profile.email ?? session.email ?? null,
     type: "full_itinerary",
     credits: -CREDITS_PER_GENERATED_TRIP,
-    description: "Roteiro completo gerado",
+    description: buildCreditTransactionDescription({
+      type: "full_itinerary",
+      destination: enrichedResult.destination || rawResult.destination,
+    }),
     createdAt: now,
   })
 
@@ -143,7 +147,7 @@ export async function POST(_: Request, context: { params: Promise<{ tripId: stri
       .from("credit_transactions")
       .delete()
       .eq("user_id", session.userId)
-      .eq("description", "Roteiro completo gerado")
+      .eq("type", "full_itinerary")
       .eq("created_at", now)
 
     return NextResponse.json({ ok: false, error: "Não foi possível salvar o roteiro completo." }, { status: 500 })

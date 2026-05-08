@@ -3,6 +3,7 @@ import { z } from "zod"
 import { recordCreditTransaction } from "@/lib/services/credit-transaction-service"
 import { getServerSession } from "@/lib/services/server-session-service"
 import { createSupabaseAdminClient } from "@/lib/supabase/server"
+import { buildCreditTransactionDescription } from "@/lib/utils/credit-transaction-labels"
 
 const payloadSchema = z.object({
   userId: z.string().uuid(),
@@ -79,7 +80,7 @@ export async function POST(request: Request) {
     email: targetProfile.email,
     type: "system",
     credits,
-    description: "Ajuste manual de créditos pelo admin",
+    description: buildCreditTransactionDescription({ type: "system" }),
   })
 
   if (transactionError) {

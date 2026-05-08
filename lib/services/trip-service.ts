@@ -5,6 +5,7 @@ import { defaultTripResult, quizResultMap, tripCatalog } from "@/lib/mocks/trips
 import { getOpenAIServerClient } from "@/lib/openai/server"
 import { CREDITS_PER_GENERATED_TRIP } from "@/lib/services/credit-service"
 import { recordCreditTransaction } from "@/lib/services/credit-transaction-service"
+import { buildCreditTransactionDescription } from "@/lib/utils/credit-transaction-labels"
 import { getCurrentUser } from "@/lib/services/user-service"
 import { createSupabaseAdminClient } from "@/lib/supabase/server"
 import { buildTripIntelligence } from "@/lib/travel/travel-intelligence"
@@ -1872,7 +1873,10 @@ export async function generateAndPersistTrip({
         email: user.email,
         type: "trip_generation",
         credits: -CREDITS_PER_GENERATED_TRIP,
-        description: "Nova viagem gerada",
+        description: buildCreditTransactionDescription({
+          type: "trip_generation",
+          destination: result.destination,
+        }),
         createdAt: now,
       })
 
@@ -1938,7 +1942,7 @@ export async function generateAndPersistTrip({
           .from("credit_transactions")
           .delete()
           .eq("user_id", user.id)
-          .eq("description", "Nova viagem gerada")
+          .eq("type", "trip_generation")
           .eq("created_at", now)
 
         return {

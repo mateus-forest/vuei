@@ -6,72 +6,18 @@ import Link from "next/link"
 import { CreditCard, HelpCircle, History, Home, LogOut, Menu, Shield, User, X } from "lucide-react"
 import { signOut } from "@/lib/services/session-service"
 import { creditPackages } from "@/lib/constants/credit-packages"
+import {
+  getCreditTransactionTitle,
+  getCreditTransactionUsagePrefix,
+} from "@/lib/utils/credit-transaction-labels"
 import { formatShortDate } from "@/lib/utils/format"
-import type { CreditHistorySummary, CreditTransactionEntry } from "@/types/credit"
+import type { CreditHistorySummary } from "@/types/credit"
 import type { Search } from "@/types/search"
 import type { User as DashboardUser } from "@/types/user"
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion"
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
-
-function getCreditTypeLabel(type: CreditTransactionEntry["type"]) {
-  switch (type) {
-    case "bonus_signup":
-      return "Crédito bônus de cadastro"
-    case "purchase":
-      return "Créditos adicionados"
-    case "trip_generation":
-      return "Nova viagem gerada"
-    case "full_itinerary":
-      return "Roteiro completo gerado"
-    case "trip_adjustment":
-      return "Viagem ajustada"
-    case "destination_comparison":
-      return "Comparação de destino"
-    case "detailed_budget":
-      return "Orçamento detalhado gerado"
-    case "refund":
-      return "Crédito estornado"
-    case "system":
-      return "Ajuste de créditos"
-    default:
-      return "Movimentação de créditos"
-  }
-}
-
-function isTechnicalCreditDescription(description: string, type: CreditTransactionEntry["type"]) {
-  const normalized = description.trim().toLowerCase()
-
-  if (!normalized) {
-    return true
-  }
-
-  if (normalized.includes("00000000-0000-0000-0000-000000000000")) {
-    return true
-  }
-
-  const uuidPattern = /[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}/i
-  if (uuidPattern.test(description)) {
-    return true
-  }
-
-  return normalized.startsWith(`${type}:`)
-}
-
-function getCreditTransactionTitle(transaction: CreditTransactionEntry) {
-  const description = transaction.description?.trim() ?? ""
-  if (!description || isTechnicalCreditDescription(description, transaction.type)) {
-    return getCreditTypeLabel(transaction.type)
-  }
-
-  return description
-}
-
-function getCreditTransactionSubtitle(transaction: CreditTransactionEntry) {
-  const prefix = transaction.credits > 0 ? "Entrada de crédito" : "Uso de crédito"
-  return `${prefix} • ${formatShortDate(transaction.createdAt)}`
-}
 
 function formatCreditDelta(value: number) {
   return `${value > 0 ? "+" : ""}${value}`
@@ -415,7 +361,7 @@ export function DashboardHeader({
                             {getCreditTransactionTitle(transaction)}
                           </div>
                           <div className="mt-1 text-xs text-muted-foreground">
-                            {getCreditTransactionSubtitle(transaction)}
+                            {getCreditTransactionUsagePrefix(transaction)} • {formatShortDate(transaction.createdAt)}
                           </div>
                         </div>
                       <div

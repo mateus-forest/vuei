@@ -5,6 +5,7 @@ import { recordCreditTransaction } from "@/lib/services/credit-transaction-servi
 import { getStripePlanConfig } from "@/lib/services/billing-service"
 import { createSupabaseAdminClient } from "@/lib/supabase/server"
 import { assertStripeWebhookSecret, getStripeServerClient } from "@/lib/stripe/server"
+import { buildCreditTransactionDescription } from "@/lib/utils/credit-transaction-labels"
 
 export const runtime = "nodejs"
 export const dynamic = "force-dynamic"
@@ -213,7 +214,7 @@ export async function POST(request: Request) {
     email,
     type: "purchase",
     credits,
-    description: `Compra de ${credits} crédito${credits === 1 ? "" : "s"} via Stripe`,
+    description: buildCreditTransactionDescription({ type: "purchase" }),
     paymentId,
   })
 
