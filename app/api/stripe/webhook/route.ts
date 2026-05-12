@@ -1,11 +1,9 @@
 import { randomUUID } from "crypto"
 import { NextResponse } from "next/server"
 import Stripe from "stripe"
-import { recordCreditTransaction } from "@/lib/services/credit-transaction-service"
-import { getStripePlanConfig } from "@/lib/services/billing-service"
 import { createSupabaseAdminClient } from "@/lib/supabase/server"
 import { assertStripeWebhookSecret, getStripeServerClient } from "@/lib/stripe/server"
-import { buildCreditTransactionDescription } from "@/lib/utils/credit-transaction-labels"
+import { resolveStripeCreditsPackage } from "@/lib/services/billing-service"
 
 export const runtime = "nodejs"
 export const dynamic = "force-dynamic"
@@ -15,6 +13,12 @@ type SupabaseLikeError = {
   code?: string
   details?: string
   hint?: string
+}
+
+type ResolvedUserContext = {
+  userId: string | null
+  email: string | null
+  source: "metadata.user_id" | "client_reference_id" | "metadata.email" | "customer_email" | "not_found"
 }
 
 function jsonOk(data: unknown, init?: ResponseInit) {
@@ -34,6 +38,147 @@ function logSupabaseError(label: string, error: SupabaseLikeError | null | undef
   })
 }
 
+function getCheckoutSessionEmail(session: Stripe.Checkout.Session) {
+  return session.metadata?.email ?? session.customer_details?.email ?? session.customer_email ?? null
+}
+
+async function getSessionPriceId(stripe: Stripe, session: Stripe.Checkout.Session) {
+  const lineItems = await stripe.checkout.sessions.listLineItems(session.id, { limit: 10 })
+  return lineItems.data[0]?.price?.id ?? null
+}
+
+async function resolveUserContext({
+  supabase,
+  session,
+}: {
+  supabase: ReturnType<typeof createSupabaseAdminClient>
+  session: Stripe.Checkout.Session
+}): Promise<ResolvedUserContext> {
+  const metadataUserId = session.metadata?.user_id ?? null
+  const clientReferenceId = session.client_reference_id ?? null
+  const metadataEmail = session.metadata?.email ?? null
+  const customerEmail = session.customer_email ?? session.customer_details?.email ?? null
+
+  const userIdCandidates: Array<{ value: string | null; source: ResolvedUserContext["source"] }> = [
+    { value: metadataUserId, source: "metadata.user_id" },
+    { value: clientReferenceId, source: "client_reference_id" },
+  ]
+
+  for (const candidate of userIdCandidates) {
+    if (!candidate.value) {
+      continue
+    }
+
+    const { data: profile, error: profileError } = await supabase
+      .from("profiles")
+      .select("id,email")
+      .eq("id", candidate.value)
+      .maybeSingle()
+
+    if (profileError) {
+      logSupabaseError("STRIPE WEBHOOK PROFILE ID LOOKUP ERROR:", profileError)
+      throw new Error("Failed to resolve user profile by id.")
+    }
+
+    if (profile?.id) {
+      return {
+        userId: profile.id,
+        email: profile.email ?? metadataEmail ?? customerEmail,
+        source: candidate.source,
+      }
+    }
+
+    const authLookup = await supabase.auth.admin.getUserById(candidate.value)
+    if (!authLookup.error && authLookup.data.user) {
+      return {
+        userId: authLookup.data.user.id,
+        email: authLookup.data.user.email ?? metadataEmail ?? customerEmail,
+        source: candidate.source,
+      }
+    }
+  }
+
+  const emailCandidates: Array<{ value: string | null; source: ResolvedUserContext["source"] }> = [
+    { value: metadataEmail, source: "metadata.email" },
+    { value: customerEmail, source: "customer_email" },
+  ]
+
+  for (const candidate of emailCandidates) {
+    if (!candidate.value) {
+      continue
+    }
+
+    const { data: profile, error: profileError } = await supabase
+      .from("profiles")
+      .select("id,email")
+      .eq("email", candidate.value)
+      .maybeSingle()
+
+    if (profileError) {
+      logSupabaseError("STRIPE WEBHOOK PROFILE EMAIL LOOKUP ERROR:", profileError)
+      throw new Error("Failed to resolve user profile by email.")
+    }
+
+    if (profile?.id) {
+      return {
+        userId: profile.id,
+        email: profile.email ?? candidate.value,
+        source: candidate.source,
+      }
+    }
+  }
+
+  return {
+    userId: null,
+    email: metadataEmail ?? customerEmail,
+    source: "not_found",
+  }
+}
+
+async function ensureProfileExists({
+  supabase,
+  userId,
+  email,
+}: {
+  supabase: ReturnType<typeof createSupabaseAdminClient>
+  userId: string
+  email: string | null
+}) {
+  const { data: existingProfile, error: existingProfileError } = await supabase
+    .from("profiles")
+    .select("id")
+    .eq("id", userId)
+    .maybeSingle()
+
+  if (existingProfileError) {
+    logSupabaseError("STRIPE WEBHOOK PROFILE EXISTENCE ERROR:", existingProfileError)
+    throw new Error("Failed to lookup profile.")
+  }
+
+  if (existingProfile) {
+    return
+  }
+
+  const { error: profileUpsertError } = await supabase.from("profiles").upsert(
+    {
+      id: userId,
+      email: email ?? "",
+      credits: 0,
+      role: "user",
+    },
+    { onConflict: "id" },
+  )
+
+  if (profileUpsertError) {
+    logSupabaseError("STRIPE WEBHOOK PROFILE UPSERT ERROR:", profileUpsertError)
+    throw new Error("Failed to create missing profile.")
+  }
+}
+
+function buildPurchaseDescription(credits: number) {
+  return `Compra de ${credits} crÃ©ditos`
+}
+
 export async function POST(request: Request) {
   const signature = request.headers.get("stripe-signature")
 
@@ -41,10 +186,10 @@ export async function POST(request: Request) {
     return jsonError("Missing Stripe signature.", 400)
   }
 
+  const body = await request.text()
   let event: Stripe.Event
 
   try {
-    const body = await request.text()
     const stripe = getStripeServerClient()
     const webhookSecret = assertStripeWebhookSecret()
     event = stripe.webhooks.constructEvent(body, signature, webhookSecret)
@@ -54,80 +199,90 @@ export async function POST(request: Request) {
   }
 
   if (event.type !== "checkout.session.completed") {
+    console.log("STRIPE WEBHOOK IGNORED EVENT", { eventId: event.id, eventType: event.type })
     return jsonOk({ received: true, ignored: true, eventType: event.type })
   }
 
+  const stripe = getStripeServerClient()
   const session = event.data.object as Stripe.Checkout.Session
-  const metadata = session.metadata ?? {}
-  const eventId = event.id
-  const eventMarker = `stripe_event:${eventId}`
   const stripeSessionId = session.id
+  const paymentStatus = session.payment_status ?? session.status ?? null
   const stripePaymentIntent =
     typeof session.payment_intent === "string" ? session.payment_intent : session.payment_intent?.id ?? null
   const amountCents = session.amount_total ?? 0
-  const status = session.payment_status ?? session.status ?? "paid"
-  const email = metadata.email ?? session.customer_details?.email ?? session.customer_email ?? null
-  const plan = metadata.plan ?? null
-  const credits = Number(metadata.credits ?? 0)
-  const planConfig = plan ? getStripePlanConfig(plan) : null
+  const sessionEmail = getCheckoutSessionEmail(session)
+
+  console.log("STRIPE WEBHOOK RECEIVED", {
+    eventId: event.id,
+    eventType: event.type,
+    stripeSessionId,
+    paymentStatus,
+    metadata: session.metadata ?? null,
+  })
 
   if (!stripeSessionId) {
     return jsonOk({ received: true, ignored: true, reason: "missing_session_id" })
   }
 
-  if (status !== "paid") {
+  if (paymentStatus !== "paid") {
+    console.log("STRIPE WEBHOOK PAYMENT NOT PAID", { stripeSessionId, paymentStatus })
     return jsonOk({ received: true, ignored: true, reason: "payment_not_confirmed" })
   }
 
-  if (!Number.isInteger(credits) || credits <= 0) {
-    return jsonOk({ received: true, ignored: true, reason: "invalid_credits" })
+  let priceId: string | null = null
+
+  try {
+    priceId = await getSessionPriceId(stripe, session)
+  } catch (error) {
+    console.error("STRIPE WEBHOOK LINE ITEMS ERROR", {
+      stripeSessionId,
+      message: error instanceof Error ? error.message : String(error),
+    })
   }
 
-  if (!planConfig || planConfig.credits !== credits) {
-    return jsonOk({ received: true, ignored: true, reason: "invalid_plan_metadata" })
+  const resolvedPackage = resolveStripeCreditsPackage({
+    credits: session.metadata?.credits ?? null,
+    plan: session.metadata?.plan ?? null,
+    priceId,
+  })
+
+  console.log("STRIPE WEBHOOK PACKAGE", {
+    stripeSessionId,
+    metadataPlan: session.metadata?.plan ?? null,
+    metadataCredits: session.metadata?.credits ?? null,
+    priceId,
+    resolvedPlan: resolvedPackage?.planId ?? null,
+    resolvedCredits: resolvedPackage?.credits ?? null,
+    resolutionSource: resolvedPackage?.source ?? null,
+  })
+
+  if (!resolvedPackage) {
+    return jsonOk({ received: true, ignored: true, reason: "invalid_package_mapping" })
   }
 
   const supabase = createSupabaseAdminClient()
+  let resolvedUser: ResolvedUserContext
 
-  const { data: existingEventTransaction, error: existingEventTransactionError } = await supabase
-    .from("credit_transactions")
-    .select("id")
-    .eq("description", eventMarker)
-    .maybeSingle()
-
-  if (existingEventTransactionError) {
-    logSupabaseError("STRIPE WEBHOOK EVENT LOOKUP ERROR:", existingEventTransactionError)
-    return jsonError("Failed to lookup processed webhook event.", 500)
+  try {
+    resolvedUser = await resolveUserContext({ supabase, session })
+  } catch (error) {
+    console.error("STRIPE WEBHOOK USER RESOLUTION ERROR", {
+      stripeSessionId,
+      message: error instanceof Error ? error.message : String(error),
+    })
+    return jsonError("Failed to resolve Stripe checkout user.", 500)
   }
 
-  if (existingEventTransaction) {
-    return jsonOk({ received: true, alreadyProcessed: true, eventId })
-  }
-
-  let resolvedUserId = metadata.user_id ?? metadata.userId ?? null
-
-  if ((!resolvedUserId || resolvedUserId === "null") && email) {
-    const { data: profileByEmail, error: profileByEmailError } = await supabase
-      .from("profiles")
-      .select("id,email,credits")
-      .eq("email", email)
-      .maybeSingle()
-
-    if (profileByEmailError) {
-      logSupabaseError("STRIPE WEBHOOK PROFILE EMAIL LOOKUP ERROR:", profileByEmailError)
-      return jsonError("Failed to resolve user profile by email.", 500)
-    }
-
-    resolvedUserId = profileByEmail?.id ?? null
-  }
-
-  if (!resolvedUserId) {
-    return jsonError("Failed to resolve user profile for credit update.", 500)
-  }
+  console.log("STRIPE WEBHOOK USER", {
+    stripeSessionId,
+    userId: resolvedUser.userId,
+    source: resolvedUser.source,
+    email: resolvedUser.email,
+  })
 
   const { data: existingPayment, error: existingPaymentError } = await supabase
     .from("payments")
-    .select("id")
+    .select("id,status,credits_applied")
     .eq("stripe_session_id", stripeSessionId)
     .maybeSingle()
 
@@ -136,92 +291,95 @@ export async function POST(request: Request) {
     return jsonError("Failed to lookup payment.", 500)
   }
 
-  let paymentId = existingPayment?.id ?? null
-
-  if (!paymentId) {
-    const { data: insertedPayment, error: paymentInsertError } = await supabase
-      .from("payments")
-      .insert({
-        id: randomUUID(),
-        user_id: resolvedUserId,
-        email,
-        stripe_session_id: stripeSessionId,
-        stripe_payment_intent: stripePaymentIntent,
-        amount_cents: amountCents,
-        currency: session.currency ?? "brl",
-        status: "paid",
-        plan,
-        credits,
-      })
-      .select("id")
-      .single()
-
-    if (paymentInsertError || !insertedPayment) {
-      logSupabaseError("STRIPE WEBHOOK PAYMENT INSERT ERROR:", paymentInsertError)
-      return jsonError("Failed to persist payment.", 500)
-    }
-
-    paymentId = insertedPayment.id
+  if (existingPayment?.credits_applied && ["paid", "completed"].includes(existingPayment.status ?? "")) {
+    console.log("STRIPE WEBHOOK IDEMPOTENT HIT", { stripeSessionId, paymentId: existingPayment.id })
+    return jsonOk({ received: true, alreadyProcessed: true, paymentId: existingPayment.id })
   }
 
-  const { data: existingTransaction, error: existingTransactionError } = await supabase
-    .from("credit_transactions")
-    .select("id")
-    .eq("payment_id", paymentId)
-    .maybeSingle()
-
-  if (existingTransactionError) {
-    logSupabaseError("STRIPE WEBHOOK TRANSACTION LOOKUP ERROR:", existingTransactionError)
-    return jsonError("Failed to lookup credit transaction.", 500)
+  const paymentPayload = {
+    id: existingPayment?.id ?? randomUUID(),
+    user_id: resolvedUser.userId,
+    email: resolvedUser.email ?? sessionEmail,
+    stripe_session_id: stripeSessionId,
+    stripe_payment_intent: stripePaymentIntent,
+    amount_cents: amountCents,
+    currency: session.currency ?? "brl",
+    status: "paid",
+    plan: resolvedPackage.planId,
+    credits: resolvedPackage.credits,
   }
 
-  if (existingTransaction) {
-    return jsonOk({ received: true, alreadyProcessed: true, paymentId })
+  const { data: payment, error: paymentUpsertError } = await supabase
+    .from("payments")
+    .upsert(paymentPayload, { onConflict: "stripe_session_id" })
+    .select("id,status,credits_applied")
+    .single()
+
+  if (paymentUpsertError || !payment) {
+    logSupabaseError("STRIPE WEBHOOK PAYMENT UPSERT ERROR:", paymentUpsertError)
+    return jsonError("Failed to persist payment.", 500)
   }
 
-  const { data: profile, error: profileLookupError } = await supabase
-    .from("profiles")
-    .select("credits")
-    .eq("id", resolvedUserId)
-    .maybeSingle()
-
-  if (profileLookupError) {
-    logSupabaseError("STRIPE WEBHOOK PROFILE LOOKUP ERROR:", profileLookupError)
-    return jsonError("Failed to lookup profile credits.", 500)
-  }
-
-  if (!profile) {
-    return jsonError("Failed to resolve user profile for credit update.", 500)
-  }
-
-  const currentCredits = typeof profile.credits === "number" ? profile.credits : 0
-
-  const { error: profileUpdateError } = await supabase
-    .from("profiles")
-    .update({
-      credits: currentCredits + credits,
+  if (!resolvedUser.userId) {
+    console.error("STRIPE WEBHOOK USER NOT FOUND", {
+      stripeSessionId,
+      paymentId: payment.id,
+      email: resolvedUser.email ?? sessionEmail,
+      status: "user_not_found",
     })
-    .eq("id", resolvedUserId)
 
-  if (profileUpdateError) {
-    logSupabaseError("STRIPE WEBHOOK PROFILE UPDATE ERROR:", profileUpdateError)
-    return jsonError("Failed to update profile credits.", 500)
+    return jsonOk({
+      received: true,
+      processed: false,
+      reason: "user_not_found",
+      paymentId: payment.id,
+      stripeSessionId,
+    })
   }
 
-  const { error: transactionInsertError } = await recordCreditTransaction({
-    supabase,
-    userId: resolvedUserId,
-    email,
-    type: "purchase",
-    credits,
-    description: buildCreditTransactionDescription({ type: "purchase" }),
-    paymentId,
+  try {
+    await ensureProfileExists({
+      supabase,
+      userId: resolvedUser.userId,
+      email: resolvedUser.email ?? sessionEmail,
+    })
+  } catch (error) {
+    return jsonError("Failed to prepare profile for credit update.", 500, error instanceof Error ? error.message : undefined)
+  }
+
+  const description = buildPurchaseDescription(resolvedPackage.credits)
+  const { data: rpcResult, error: rpcError } = await supabase.rpc("apply_stripe_credit_purchase", {
+    p_payment_id: payment.id,
+    p_user_id: resolvedUser.userId,
+    p_credits: resolvedPackage.credits,
+    p_email: resolvedUser.email ?? sessionEmail,
+    p_description: description,
   })
 
-  if (transactionInsertError) {
-    logSupabaseError("STRIPE WEBHOOK TRANSACTION INSERT ERROR:", transactionInsertError)
-    return jsonError("Failed to persist credit transaction.", 500)
+  if (rpcError) {
+    logSupabaseError("STRIPE WEBHOOK APPLY CREDITS ERROR:", rpcError)
+    return jsonError("Failed to apply purchased credits.", 500)
   }
 
-  return jsonOk({ received: true, processed: true, paymentId, userId: resolvedUserId, eventId })
+  const applyResult = Array.isArray(rpcResult) ? rpcResult[0] : rpcResult
+
+  console.log("STRIPE WEBHOOK APPLIED", {
+    stripeSessionId,
+    paymentId: payment.id,
+    userId: resolvedUser.userId,
+    plan: resolvedPackage.planId,
+    credits: resolvedPackage.credits,
+    result: applyResult ?? null,
+  })
+
+  return jsonOk({
+    received: true,
+    processed: true,
+    paymentId: payment.id,
+    userId: resolvedUser.userId,
+    stripeSessionId,
+    plan: resolvedPackage.planId,
+    credits: resolvedPackage.credits,
+    applyResult: applyResult ?? null,
+  })
 }

@@ -71,5 +71,6 @@ export type PaymentRow = {
   status: string | null
   plan: string | null
   credits: number
+  credits_applied: boolean
   created_at: string
 }

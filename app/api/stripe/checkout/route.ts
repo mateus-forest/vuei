@@ -2,7 +2,7 @@ import { NextResponse } from "next/server"
 import { z } from "zod"
 import { createSupabaseServerClient } from "@/lib/supabase/server"
 import { getStripeServerClient } from "@/lib/stripe/server"
-import { getAppBaseUrl, getStripePlanConfig } from "@/lib/services/billing-service"
+import { getAppBaseUrl, getStripePlanConfig, normalizeStripePlanId } from "@/lib/services/billing-service"
 
 export const runtime = "nodejs"
 export const dynamic = "force-dynamic"
@@ -45,12 +45,14 @@ export async function POST(request: Request) {
     return jsonError("Os dados enviados para checkout são inválidos.", "INVALID_PAYLOAD", 400, parsed.error.message)
   }
 
-  const planId = parsed.data.plan
-  const plan = getStripePlanConfig(planId)
+  const requestedPlanId = parsed.data.plan
+  const normalizedPlanId = normalizeStripePlanId(requestedPlanId)
+  const plan = normalizedPlanId ? getStripePlanConfig(normalizedPlanId) : null
   const hasStripeSecretKey = Boolean(process.env.STRIPE_SECRET_KEY)
   const appUrl = getAppBaseUrl()
 
-  console.log("CHECKOUT PLAN", planId)
+  console.log("CHECKOUT PLAN REQUESTED", requestedPlanId)
+  console.log("CHECKOUT PLAN NORMALIZED", normalizedPlanId)
   console.log("CHECKOUT PRICE ID", plan?.priceId ?? null)
   console.log("CHECKOUT STRIPE SECRET CONFIGURED", hasStripeSecretKey)
   console.log("CHECKOUT APP URL", appUrl)
@@ -84,6 +86,7 @@ export async function POST(request: Request) {
       mode: "payment",
       success_url: `${appUrl}/dashboard?checkout=success`,
       cancel_url: `${appUrl}/dashboard?checkout=cancel`,
+      client_reference_id: user.id,
       line_items: [
         {
           price: plan.priceId,
@@ -92,7 +95,6 @@ export async function POST(request: Request) {
       ],
       customer_email: user.email ?? undefined,
       metadata: {
-        userId: user.id,
         user_id: user.id,
         email: user.email ?? "",
         plan: plan.id,
@@ -111,6 +113,8 @@ export async function POST(request: Request) {
     console.error("CHECKOUT ERROR", {
       runtime,
       stripeSecretConfigured: hasStripeSecretKey,
+      requestedPlanId,
+      normalizedPlanId,
       priceId: plan.priceId,
       message: stripeError?.message,
       type: stripeError?.type,

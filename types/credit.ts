@@ -10,7 +10,7 @@ export type CreditTransactionType =
   | "system"
 
 export type CreditPackage = {
-  id: string
+  id: "pack_5" | "pack_15" | "pack_30"
   credits: number
   price: string
   highlight?: string
