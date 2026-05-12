@@ -1,6 +1,6 @@
 "use client"
 
-import { useMemo, useState, useTransition } from "react"
+import { useState, useTransition } from "react"
 import { useRouter } from "next/navigation"
 import { CreditCard, Search, ShieldCheck, Users, Wallet } from "lucide-react"
 import { creditPackages } from "@/lib/constants/credit-packages"
@@ -8,7 +8,7 @@ import type { CreditTransactionRow } from "@/types/database"
 import { formatShortDate } from "@/lib/utils/format"
 import type { Search as SearchItem } from "@/types/search"
 import type { User } from "@/types/user"
-import type { AdminPurchase } from "@/lib/services/admin-service"
+import type { AdminFinanceData, AdminPurchase } from "@/lib/services/admin-service"
 import { BrandCard } from "@/components/ui/brand-card"
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 
@@ -19,11 +19,6 @@ type AdminUser = User & {
 }
 
 type AdminActionResponse = { ok: true; data?: unknown } | { ok: false; error: string }
-
-function parseCurrency(value: string) {
-  const normalized = value.replace(/[^\d,]/g, "").replace(",", ".")
-  return Number(normalized)
-}
 
 function resolveSearchOrigin(origin: SearchItem["origin"]) {
   if (origin === "quiz") return "quiz"
@@ -51,57 +46,37 @@ export function AdminPanel({
   searches,
   purchases,
   creditTransactions,
+  finance,
 }: {
   users: User[]
   searches: SearchItem[]
   purchases: AdminPurchase[]
   creditTransactions: CreditTransactionRow[]
+  finance: AdminFinanceData
 }) {
   const [selectedUser, setSelectedUser] = useState<AdminUser | null>(null)
   const [isPending, startTransition] = useTransition()
   const router = useRouter()
 
-  const adminUsers = useMemo<AdminUser[]>(
-    () =>
-      users.map((user) => {
-        const backendStatus = user.status === "blocked" ? "blocked" : "active"
-
-        return {
-          ...user,
-          backendStatus,
-          statusLabel: backendStatus === "blocked" ? "inativo" : "ativo",
-          totalSearches: searches.filter((search) => search.userId === user.id).length,
-        }
-      }),
-    [searches, users],
-  )
-
-  const metrics = useMemo(() => {
-    const soldCreditsFromPayments = purchases.reduce((accumulator, purchase) => {
-      const matched = creditPackages.find((pack) => `${pack.credits} créditos` === purchase.packLabel)
-      return accumulator + (matched?.credits ?? 0)
-    }, 0)
-
-    const soldCreditsFromTransactions = creditTransactions
-      .filter((transaction) => transaction.type === "purchase")
-      .reduce((accumulator, transaction) => accumulator + Math.max(transaction.credits, 0), 0)
-
-    const estimatedRevenue = purchases.reduce((accumulator, purchase) => accumulator + parseCurrency(purchase.value), 0)
-    const consumedCredits = creditTransactions
-      .filter((transaction) => transaction.credits < 0)
-      .reduce((accumulator, transaction) => accumulator + Math.abs(transaction.credits), 0)
+  const adminUsers: AdminUser[] = users.map((user) => {
+    const backendStatus = user.status === "blocked" ? "blocked" : "active"
 
     return {
-      totalUsers: adminUsers.length,
-      totalSearches: searches.length,
-      consumedCredits,
-      soldCredits: soldCreditsFromPayments || soldCreditsFromTransactions,
-      estimatedRevenue: estimatedRevenue.toLocaleString("pt-BR", {
-        style: "currency",
-        currency: "BRL",
-      }),
+      ...user,
+      backendStatus,
+      statusLabel: backendStatus === "blocked" ? "inativo" : "ativo",
+      totalSearches: searches.filter((search) => search.userId === user.id).length,
     }
-  }, [adminUsers.length, creditTransactions, purchases, searches.length])
+  })
+
+  const consumedCredits = creditTransactions
+    .filter((transaction) => transaction.credits < 0)
+    .reduce((accumulator, transaction) => accumulator + Math.abs(transaction.credits), 0)
+
+  const estimatedRevenue = new Intl.NumberFormat("pt-BR", {
+    style: "currency",
+    currency: "BRL",
+  }).format(finance.estimatedRevenueCents / 100)
 
   async function handleAddCredits(user: AdminUser) {
     const rawCredits = window.prompt("Quantidade de créditos para adicionar:", "5")
@@ -176,41 +151,48 @@ export function AdminPanel({
   return (
     <>
       <div className="space-y-6">
-        <div className="grid gap-6 md:grid-cols-2 xl:grid-cols-5">
+        <div className="grid gap-6 md:grid-cols-2 xl:grid-cols-6">
           <BrandCard className="p-6">
             <div className="flex items-center gap-2 text-sm text-muted-foreground">
               <Users className="size-4 text-[#004aad]" />
               Total de usuários
             </div>
-            <div className="mt-3 text-4xl font-semibold text-foreground">{metrics.totalUsers}</div>
+            <div className="mt-3 text-4xl font-semibold text-foreground">{adminUsers.length}</div>
           </BrandCard>
           <BrandCard className="p-6">
             <div className="flex items-center gap-2 text-sm text-muted-foreground">
               <Search className="size-4 text-[#004aad]" />
               Total de buscas geradas
             </div>
-            <div className="mt-3 text-4xl font-semibold text-foreground">{metrics.totalSearches}</div>
+            <div className="mt-3 text-4xl font-semibold text-foreground">{searches.length}</div>
           </BrandCard>
           <BrandCard className="p-6">
             <div className="flex items-center gap-2 text-sm text-muted-foreground">
               <Wallet className="size-4 text-[#004aad]" />
               Créditos consumidos
             </div>
-            <div className="mt-3 text-4xl font-semibold text-foreground">{metrics.consumedCredits}</div>
+            <div className="mt-3 text-4xl font-semibold text-foreground">{consumedCredits}</div>
+          </BrandCard>
+          <BrandCard className="p-6">
+            <div className="flex items-center gap-2 text-sm text-muted-foreground">
+              <CreditCard className="size-4 text-[#004aad]" />
+              Pagamentos realizados
+            </div>
+            <div className="mt-3 text-4xl font-semibold text-foreground">{finance.paymentsCount}</div>
           </BrandCard>
           <BrandCard className="p-6">
             <div className="flex items-center gap-2 text-sm text-muted-foreground">
               <CreditCard className="size-4 text-[#004aad]" />
               Créditos vendidos
             </div>
-            <div className="mt-3 text-4xl font-semibold text-foreground">{metrics.soldCredits}</div>
+            <div className="mt-3 text-4xl font-semibold text-foreground">{finance.soldCredits}</div>
           </BrandCard>
           <BrandCard className="p-6">
             <div className="flex items-center gap-2 text-sm text-muted-foreground">
               <ShieldCheck className="size-4 text-[#004aad]" />
               Receita estimada
             </div>
-            <div className="mt-3 text-4xl font-semibold text-foreground">{metrics.estimatedRevenue}</div>
+            <div className="mt-3 text-4xl font-semibold text-foreground">{estimatedRevenue}</div>
           </BrandCard>
         </div>
 
@@ -309,9 +291,10 @@ export function AdminPanel({
               <div className="space-y-3">
                 {purchases.map((purchase) => (
                   <div key={purchase.id} className="rounded-2xl border border-border/60 px-4 py-4">
-                    <div className="grid gap-3 sm:grid-cols-[1fr_0.9fr_0.7fr_0.7fr_0.7fr] sm:items-center">
-                      <div className="text-sm font-medium text-foreground">{purchase.user}</div>
-                      <div className="text-sm text-muted-foreground">{purchase.packLabel}</div>
+                    <div className="grid gap-3 sm:grid-cols-[1.2fr_0.7fr_0.7fr_0.7fr_0.7fr_0.6fr] sm:items-center">
+                      <div className="text-sm font-medium text-foreground">{purchase.email ?? purchase.user}</div>
+                      <div className="text-sm text-muted-foreground">{purchase.plan ?? "sem plano"}</div>
+                      <div className="text-sm text-muted-foreground">{purchase.credits} créditos</div>
                       <div className="text-sm text-muted-foreground">{purchase.value}</div>
                       <div className="text-sm text-muted-foreground">{formatShortDate(purchase.date)}</div>
                       <div className="text-sm text-muted-foreground">{purchase.status}</div>

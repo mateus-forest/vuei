@@ -7,10 +7,29 @@ import { createSupabaseAdminClient } from "@/lib/supabase/server"
 export type AdminPurchase = {
   id: string
   user: string
+  email: string | null
+  plan: string | null
   packLabel: string
+  credits: number
   value: string
+  amountCents: number
   date: string
   status: string
+}
+
+export type AdminFinanceData = {
+  paymentsCount: number
+  soldCredits: number
+  estimatedRevenueCents: number
+  recentPurchases: AdminPurchase[]
+}
+
+type AdminPanelData = {
+  users: User[]
+  searches: Search[]
+  creditTransactions: CreditTransactionRow[]
+  purchases: AdminPurchase[]
+  finance: AdminFinanceData
 }
 
 function logAdminQueryError(
@@ -59,6 +78,48 @@ function formatCurrency(value: number) {
     style: "currency",
     currency: "BRL",
   }).format(value)
+}
+
+function isPaidPaymentStatus(status: string | null | undefined) {
+  return status === "paid" || status === "completed"
+}
+
+function resolvePurchaseLabel(payment: Pick<PaymentRow, "plan" | "credits">) {
+  if (payment.credits > 0) {
+    return `${payment.credits} créditos`
+  }
+
+  if (payment.plan === "pack_5") {
+    return "5 créditos"
+  }
+
+  if (payment.plan === "pack_15") {
+    return "15 créditos"
+  }
+
+  if (payment.plan === "pack_30") {
+    return "30 créditos"
+  }
+
+  return "Pacote indisponível"
+}
+
+function mapPaymentToAdminPurchase(
+  payment: Pick<PaymentRow, "id" | "user_id" | "email" | "amount_cents" | "created_at" | "status" | "credits" | "plan">,
+  userLabels: Map<string, string>,
+) {
+  return {
+    id: payment.id,
+    user: payment.user_id ? userLabels.get(payment.user_id) ?? payment.email ?? payment.user_id : payment.email ?? "Sem usuário",
+    email: payment.email,
+    plan: payment.plan,
+    packLabel: resolvePurchaseLabel(payment),
+    credits: payment.credits ?? 0,
+    value: formatCurrency((payment.amount_cents ?? 0) / 100),
+    amountCents: payment.amount_cents ?? 0,
+    date: payment.created_at,
+    status: payment.status ?? "pendente",
+  }
 }
 
 function mapSearchRowToSearch(row: SearchRow): Search {
@@ -219,7 +280,7 @@ async function listAdminPayments() {
     const supabase = createSupabaseAdminClient()
     const { data, error } = await supabase
       .from("payments")
-      .select("id,user_id,email,amount_cents,created_at,status,credits")
+      .select("id,user_id,email,amount_cents,created_at,status,credits,plan")
       .order("created_at", { ascending: false })
 
     if (error || !data) {
@@ -228,7 +289,7 @@ async function listAdminPayments() {
     }
 
     return data as Array<
-      Pick<PaymentRow, "id" | "user_id" | "email" | "amount_cents" | "created_at" | "status" | "credits">
+      Pick<PaymentRow, "id" | "user_id" | "email" | "amount_cents" | "created_at" | "status" | "credits" | "plan">
     >
   } catch (error) {
     logAdminQueryError("payments", {
@@ -241,28 +302,49 @@ async function listAdminPayments() {
   }
 }
 
-export async function getAdminPanelData() {
-  const [users, searches, creditTransactions, payments] = await Promise.all([
-    listAdminUsers().catch(() => []),
-    listAdminSearches().catch(() => []),
-    listAdminCreditTransactions().catch(() => []),
+export async function getAdminFinanceData(): Promise<AdminFinanceData> {
+  const [payments, creditTransactions, users] = await Promise.all([
     listAdminPayments().catch(() => []),
+    listAdminCreditTransactions().catch(() => []),
+    listAdminUsers().catch(() => []),
   ])
 
   const userLabels = new Map(users.map((user) => [user.id, user.email]))
-  const purchases: AdminPurchase[] = payments.map((payment) => ({
-    id: payment.id,
-    user: payment.user_id ? userLabels.get(payment.user_id) ?? payment.user_id : "Sem usuário",
-    packLabel: payment.credits ? `${payment.credits} créditos` : "Pacote indisponível",
-    value: formatCurrency((payment.amount_cents ?? 0) / 100),
-    date: payment.created_at,
-    status: payment.status ?? "pendente",
-  }))
+  const paidPayments = payments.filter((payment) => isPaidPaymentStatus(payment.status))
+  const recentPurchases = paidPayments.slice(0, 10).map((payment) => mapPaymentToAdminPurchase(payment, userLabels))
+
+  const soldCreditsFromTransactions = creditTransactions
+    .filter((transaction) => transaction.type === "purchase" && transaction.credits > 0)
+    .reduce((total, transaction) => total + transaction.credits, 0)
+
+  const soldCreditsFromPayments = paidPayments.reduce((total, payment) => total + Math.max(payment.credits ?? 0, 0), 0)
+
+  return {
+    paymentsCount: paidPayments.length,
+    soldCredits: soldCreditsFromTransactions || soldCreditsFromPayments,
+    estimatedRevenueCents: paidPayments.reduce((total, payment) => total + Math.max(payment.amount_cents ?? 0, 0), 0),
+    recentPurchases,
+  }
+}
+
+export async function getAdminPanelData(): Promise<AdminPanelData> {
+  const [users, searches, creditTransactions, finance] = await Promise.all([
+    listAdminUsers().catch(() => []),
+    listAdminSearches().catch(() => []),
+    listAdminCreditTransactions().catch(() => []),
+    getAdminFinanceData().catch(() => ({
+      paymentsCount: 0,
+      soldCredits: 0,
+      estimatedRevenueCents: 0,
+      recentPurchases: [],
+    })),
+  ])
 
   return {
     users,
     searches,
-    purchases,
+    purchases: finance.recentPurchases,
     creditTransactions,
+    finance,
   }
 }
