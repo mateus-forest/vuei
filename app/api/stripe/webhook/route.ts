@@ -1,9 +1,9 @@
 import { randomUUID } from "crypto"
 import { NextResponse } from "next/server"
 import Stripe from "stripe"
-import { createSupabaseAdminClient } from "@/lib/supabase/server"
-import { assertStripeWebhookSecret, getStripeServerClient } from "@/lib/stripe/server"
 import { resolveStripeCreditsPackage } from "@/lib/services/billing-service"
+import { assertStripeWebhookSecret, getStripeServerClient } from "@/lib/stripe/server"
+import { createSupabaseAdminClient } from "@/lib/supabase/server"
 
 export const runtime = "nodejs"
 export const dynamic = "force-dynamic"
@@ -176,7 +176,57 @@ async function ensureProfileExists({
 }
 
 function buildPurchaseDescription(credits: number) {
-  return `Compra de ${credits} créditos`
+  return `Compra de ${credits} creditos`
+}
+
+async function persistPendingPayment({
+  supabase,
+  existingPaymentId,
+  userId,
+  email,
+  stripeSessionId,
+  stripePaymentIntent,
+  amountCents,
+  currency,
+  plan,
+  credits,
+}: {
+  supabase: ReturnType<typeof createSupabaseAdminClient>
+  existingPaymentId: string | null
+  userId: string | null
+  email: string | null
+  stripeSessionId: string
+  stripePaymentIntent: string | null
+  amountCents: number
+  currency: string
+  plan: string
+  credits: number
+}) {
+  const paymentPayload = {
+    id: existingPaymentId ?? randomUUID(),
+    user_id: userId,
+    email,
+    stripe_session_id: stripeSessionId,
+    stripe_payment_intent: stripePaymentIntent,
+    amount_cents: amountCents,
+    currency,
+    status: "paid",
+    plan,
+    credits,
+    credits_applied: false,
+  }
+
+  const query = existingPaymentId
+    ? supabase.from("payments").update(paymentPayload).eq("id", existingPaymentId)
+    : supabase.from("payments").insert(paymentPayload)
+
+  const { data, error } = await query.select("id,status,credits_applied").single()
+
+  if (error || !data) {
+    return { data: null, error }
+  }
+
+  return { data, error: null }
 }
 
 export async function POST(req: Request) {
@@ -288,31 +338,30 @@ export async function POST(req: Request) {
       return jsonError("Failed to lookup payment.", 500)
     }
 
-    if (existingPayment?.credits_applied && ["paid", "completed"].includes(existingPayment.status ?? "")) {
-      return jsonOk({ received: true, alreadyProcessed: true, paymentId: existingPayment.id })
+    if (existingPayment?.credits_applied) {
+      return jsonOk({
+        received: true,
+        alreadyProcessed: true,
+        paymentId: existingPayment.id,
+        stripeSessionId,
+      })
     }
 
-    const paymentPayload = {
-      id: existingPayment?.id ?? randomUUID(),
-      user_id: resolvedUser.userId,
+    const { data: payment, error: paymentPersistError } = await persistPendingPayment({
+      supabase,
+      existingPaymentId: existingPayment?.id ?? null,
+      userId: resolvedUser.userId,
       email: resolvedUser.email ?? sessionEmail,
-      stripe_session_id: stripeSessionId,
-      stripe_payment_intent: stripePaymentIntent,
-      amount_cents: amountCents,
+      stripeSessionId,
+      stripePaymentIntent,
+      amountCents,
       currency: session.currency ?? "brl",
-      status: "paid",
       plan: resolvedPackage.planId,
       credits: resolvedPackage.credits,
-    }
+    })
 
-    const { data: payment, error: paymentUpsertError } = await supabase
-      .from("payments")
-      .upsert(paymentPayload, { onConflict: "stripe_session_id" })
-      .select("id,status,credits_applied")
-      .single()
-
-    if (paymentUpsertError || !payment) {
-      logSupabaseError("STRIPE_WEBHOOK_ERROR", paymentUpsertError)
+    if (paymentPersistError || !payment) {
+      logSupabaseError("STRIPE_WEBHOOK_ERROR", paymentPersistError)
       return jsonError("Failed to persist payment.", 500)
     }
 
@@ -356,6 +405,23 @@ export async function POST(req: Request) {
     }
 
     const applyResult = Array.isArray(rpcResult) ? rpcResult[0] : rpcResult
+
+    const { error: paymentFinalizeError } = await supabase
+      .from("payments")
+      .update({
+        user_id: resolvedUser.userId,
+        email: resolvedUser.email ?? sessionEmail,
+        status: "paid",
+        plan: resolvedPackage.planId,
+        credits: resolvedPackage.credits,
+        credits_applied: true,
+      })
+      .eq("id", payment.id)
+
+    if (paymentFinalizeError) {
+      logSupabaseError("STRIPE_WEBHOOK_ERROR", paymentFinalizeError)
+      return jsonError("Failed to finalize payment credit status.", 500)
+    }
 
     return jsonOk({
       received: true,
