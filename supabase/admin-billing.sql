@@ -62,6 +62,10 @@ using (auth.uid() = user_id or user_id is null);
 alter table public.payments
 add column if not exists credits_applied boolean default false;
 
+create unique index if not exists credit_transactions_purchase_payment_id_unique
+on public.credit_transactions (payment_id)
+where payment_id is not null and type = 'purchase';
+
 create or replace function public.apply_stripe_credit_purchase(
   p_payment_id uuid,
   p_user_id uuid,

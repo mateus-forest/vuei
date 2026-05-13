@@ -203,7 +203,6 @@ async function persistPendingPayment({
   credits: number
 }) {
   const paymentPayload = {
-    id: existingPaymentId ?? randomUUID(),
     user_id: userId,
     email,
     stripe_session_id: stripeSessionId,
@@ -216,11 +215,58 @@ async function persistPendingPayment({
     credits_applied: false,
   }
 
-  const query = existingPaymentId
-    ? supabase.from("payments").update(paymentPayload).eq("id", existingPaymentId)
-    : supabase.from("payments").insert(paymentPayload)
+  if (existingPaymentId) {
+    const { data, error } = await supabase
+      .from("payments")
+      .update(paymentPayload)
+      .eq("id", existingPaymentId)
+      .eq("credits_applied", false)
+      .select("id,status,credits_applied")
+      .maybeSingle()
 
-  const { data, error } = await query.select("id,status,credits_applied").single()
+    if (error) {
+      return { data: null, error }
+    }
+
+    if (data) {
+      return { data, error: null }
+    }
+
+    const { data: latestPayment, error: latestPaymentError } = await supabase
+      .from("payments")
+      .select("id,status,credits_applied")
+      .eq("id", existingPaymentId)
+      .maybeSingle()
+
+    if (latestPaymentError || !latestPayment) {
+      return { data: null, error: latestPaymentError }
+    }
+
+    return { data: latestPayment, error: null }
+  }
+
+  const { data, error } = await supabase
+    .from("payments")
+    .insert({
+      id: randomUUID(),
+      ...paymentPayload,
+    })
+    .select("id,status,credits_applied")
+    .single()
+
+  if (error?.code === "23505") {
+    const { data: latestPayment, error: latestPaymentError } = await supabase
+      .from("payments")
+      .select("id,status,credits_applied")
+      .eq("stripe_session_id", stripeSessionId)
+      .maybeSingle()
+
+    if (latestPaymentError || !latestPayment) {
+      return { data: null, error: latestPaymentError ?? error }
+    }
+
+    return { data: latestPayment, error: null }
+  }
 
   if (error || !data) {
     return { data: null, error }
@@ -363,6 +409,15 @@ export async function POST(req: Request) {
     if (paymentPersistError || !payment) {
       logSupabaseError("STRIPE_WEBHOOK_ERROR", paymentPersistError)
       return jsonError("Failed to persist payment.", 500)
+    }
+
+    if (payment.credits_applied) {
+      return jsonOk({
+        received: true,
+        alreadyProcessed: true,
+        paymentId: payment.id,
+        stripeSessionId,
+      })
     }
 
     if (!resolvedUser.userId) {
