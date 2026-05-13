@@ -145,20 +145,13 @@ export async function POST(request: Request) {
   }
 
   const { data, error } = await supabase
-    .from("support_tickets")
-    .insert({
-      user_id: session.userId,
-      email: session.email ?? null,
-      category: parsed.data.category,
-      subject,
-      message,
-      status: "open",
-      priority: "normal",
-      related_search_id: relatedSearchId,
-      related_payment_id: relatedPaymentId,
+    .rpc("create_support_ticket", {
+      p_user_id: session.userId,
+      p_email: session.email ?? null,
+      p_category: parsed.data.category,
+      p_subject: subject,
+      p_message: message,
     })
-    .select("*")
-    .single()
 
   if (error || !data) {
     console.error("SUPPORT_TICKET_INSERT_ERROR", {
@@ -171,6 +164,7 @@ export async function POST(request: Request) {
       category: parsed.data.category,
       subject,
       messageLength: message.length,
+      usingRpc: true,
     })
     return jsonError("Não foi possível abrir seu chamado agora.", 500)
   }

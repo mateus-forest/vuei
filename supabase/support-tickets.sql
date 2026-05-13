@@ -32,6 +32,10 @@ create table if not exists public.support_tickets (
 
 alter table public.support_tickets enable row level security;
 
+grant usage on schema public to anon, authenticated, service_role;
+grant select, insert on table public.support_tickets to authenticated;
+grant all on table public.support_tickets to service_role;
+
 create or replace function public.set_support_ticket_updated_at()
 returns trigger
 language plpgsql
@@ -61,3 +65,62 @@ on public.support_tickets
 for select
 to authenticated
 using (auth.uid() = user_id);
+
+create or replace function public.create_support_ticket(
+  p_user_id uuid,
+  p_email text,
+  p_category text,
+  p_subject text,
+  p_message text
+)
+returns public.support_tickets
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  v_ticket public.support_tickets;
+begin
+  insert into public.support_tickets (
+    user_id,
+    email,
+    category,
+    subject,
+    message,
+    status,
+    priority
+  )
+  values (
+    p_user_id,
+    p_email,
+    p_category,
+    nullif(trim(coalesce(p_subject, '')), ''),
+    trim(p_message),
+    'open',
+    'normal'
+  )
+  returning *
+  into v_ticket;
+
+  return v_ticket;
+end;
+$$;
+
+grant execute on function public.create_support_ticket(uuid, text, text, text, text) to service_role;
+
+create or replace function public.support_tickets_debug_check()
+returns table (
+  table_exists boolean,
+  schema_name text
+)
+language sql
+security definer
+set search_path = public
+as $$
+  select to_regclass('public.support_tickets') is not null as table_exists, 'public'::text as schema_name;
+$$;
+
+grant execute on function public.support_tickets_debug_check() to service_role;
+
+notify pgrst, 'reload schema';
+select pg_notification_queue_usage();
