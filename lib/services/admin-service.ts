@@ -1,7 +1,9 @@
-import type { CreditTransactionRow, PaymentRow, ProfileRow, SearchRow } from "@/types/database"
+import type { CreditTransactionRow, PaymentRow, ProfileRow, SearchRow, SupportTicketRow } from "@/types/database"
 import type { Search } from "@/types/search"
+import type { SupportTicket } from "@/types/support"
 import type { User } from "@/types/user"
 import type { TripItineraryDay, TripResult } from "@/types/trip"
+import { mapSupportTicketRow } from "@/lib/services/support-service"
 import { createSupabaseAdminClient } from "@/lib/supabase/server"
 
 export type AdminPurchase = {
@@ -24,16 +26,24 @@ export type AdminFinanceData = {
   recentPurchases: AdminPurchase[]
 }
 
+export type AdminSupportData = {
+  openCount: number
+  inReviewCount: number
+  resolvedCount: number
+  recentTickets: SupportTicket[]
+}
+
 type AdminPanelData = {
   users: User[]
   searches: Search[]
   creditTransactions: CreditTransactionRow[]
   purchases: AdminPurchase[]
   finance: AdminFinanceData
+  support: AdminSupportData
 }
 
 function logAdminQueryError(
-  table: "profiles" | "searches" | "credit_transactions" | "payments",
+  table: "profiles" | "searches" | "credit_transactions" | "payments" | "support_tickets",
   error: { message?: string; code?: string; details?: string | null; hint?: string | null } | null | undefined,
 ) {
   console.error("ADMIN QUERY ERROR", {
@@ -302,6 +312,28 @@ async function listAdminPayments() {
   }
 }
 
+async function listAdminSupportTickets() {
+  try {
+    const supabase = createSupabaseAdminClient()
+    const { data, error } = await supabase.from("support_tickets").select("*").order("created_at", { ascending: false })
+
+    if (error || !data) {
+      logAdminQueryError("support_tickets", error)
+      return []
+    }
+
+    return (data as SupportTicketRow[]).map(mapSupportTicketRow)
+  } catch (error) {
+    logAdminQueryError("support_tickets", {
+      message: error instanceof Error ? error.message : String(error),
+      code: undefined,
+      details: null,
+      hint: null,
+    })
+    return []
+  }
+}
+
 export async function getAdminFinanceData(): Promise<AdminFinanceData> {
   const [payments, creditTransactions, users] = await Promise.all([
     listAdminPayments().catch(() => []),
@@ -327,8 +359,19 @@ export async function getAdminFinanceData(): Promise<AdminFinanceData> {
   }
 }
 
+export async function getAdminSupportData(): Promise<AdminSupportData> {
+  const tickets = await listAdminSupportTickets().catch(() => [])
+
+  return {
+    openCount: tickets.filter((ticket) => ticket.status === "open").length,
+    inReviewCount: tickets.filter((ticket) => ticket.status === "in_review").length,
+    resolvedCount: tickets.filter((ticket) => ticket.status === "resolved").length,
+    recentTickets: tickets.slice(0, 20),
+  }
+}
+
 export async function getAdminPanelData(): Promise<AdminPanelData> {
-  const [users, searches, creditTransactions, finance] = await Promise.all([
+  const [users, searches, creditTransactions, finance, support] = await Promise.all([
     listAdminUsers().catch(() => []),
     listAdminSearches().catch(() => []),
     listAdminCreditTransactions().catch(() => []),
@@ -338,6 +381,12 @@ export async function getAdminPanelData(): Promise<AdminPanelData> {
       estimatedRevenueCents: 0,
       recentPurchases: [],
     })),
+    getAdminSupportData().catch(() => ({
+      openCount: 0,
+      inReviewCount: 0,
+      resolvedCount: 0,
+      recentTickets: [],
+    })),
   ])
 
   return {
@@ -346,5 +395,6 @@ export async function getAdminPanelData(): Promise<AdminPanelData> {
     purchases: finance.recentPurchases,
     creditTransactions,
     finance,
+    support,
   }
 }

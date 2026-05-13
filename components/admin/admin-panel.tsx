@@ -3,12 +3,13 @@
 import { useState, useTransition } from "react"
 import { useRouter } from "next/navigation"
 import { CreditCard, Search, ShieldCheck, Users, Wallet } from "lucide-react"
+import { AdminSupportCard } from "@/components/admin/admin-support-card"
 import { creditPackages } from "@/lib/constants/credit-packages"
 import type { CreditTransactionRow } from "@/types/database"
 import { formatShortDate } from "@/lib/utils/format"
 import type { Search as SearchItem } from "@/types/search"
 import type { User } from "@/types/user"
-import type { AdminFinanceData, AdminPurchase } from "@/lib/services/admin-service"
+import type { AdminFinanceData, AdminPurchase, AdminSupportData } from "@/lib/services/admin-service"
 import { BrandCard } from "@/components/ui/brand-card"
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 
@@ -47,12 +48,14 @@ export function AdminPanel({
   purchases,
   creditTransactions,
   finance,
+  support,
 }: {
   users: User[]
   searches: SearchItem[]
   purchases: AdminPurchase[]
   creditTransactions: CreditTransactionRow[]
   finance: AdminFinanceData
+  support: AdminSupportData
 }) {
   const [selectedUser, setSelectedUser] = useState<AdminUser | null>(null)
   const [isPending, startTransition] = useTransition()
@@ -310,6 +313,8 @@ export function AdminPanel({
             </div>
           </div>
         </BrandCard>
+
+        <AdminSupportCard support={support} />
       </div>
 
       <Dialog open={!!selectedUser} onOpenChange={(open) => (open ? null : setSelectedUser(null))}>

@@ -25,7 +25,7 @@ export default async function AdminPage() {
     redirect("/login")
   }
 
-  const { users, searches, purchases, creditTransactions, finance } = await getAdminPanelData()
+  const { users, searches, purchases, creditTransactions, finance, support } = await getAdminPanelData()
 
   return (
     <main className="min-h-screen bg-background">
@@ -37,6 +37,7 @@ export default async function AdminPage() {
           purchases={purchases}
           creditTransactions={creditTransactions}
           finance={finance}
+          support={support}
         />
       </SectionShell>
     </main>

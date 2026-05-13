@@ -74,3 +74,27 @@ export type PaymentRow = {
   credits_applied: boolean
   created_at: string
 }
+
+export type SupportTicketRow = {
+  id: string
+  user_id: string | null
+  email: string | null
+  category:
+    | "credits_not_received"
+    | "credit_consumed_error"
+    | "simulation_not_generated"
+    | "download_issue"
+    | "itinerary_issue"
+    | "payment_refund"
+    | "other"
+  subject: string | null
+  message: string
+  status: "open" | "in_review" | "resolved" | "canceled"
+  priority: "low" | "normal" | "high"
+  related_search_id: string | null
+  related_payment_id: string | null
+  admin_note: string | null
+  created_at: string
+  updated_at: string
+  resolved_at: string | null
+}

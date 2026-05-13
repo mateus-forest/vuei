@@ -1,6 +1,6 @@
 ﻿"use client"
 
-import { useState } from "react"
+import { useRef, useState } from "react"
 import Image from "next/image"
 import Link from "next/link"
 import { CreditCard, HelpCircle, History, Home, LogOut, Menu, Shield, User, X } from "lucide-react"
@@ -18,6 +18,7 @@ import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
+import { SupportTicketsPanel, type SupportTicketsPanelHandle } from "@/components/dashboard/support-tickets-panel"
 
 function formatCreditDelta(value: number) {
   return `${value > 0 ? "+" : ""}${value}`
@@ -50,6 +51,7 @@ export function DashboardHeader({
     newPassword: "",
     confirmPassword: "",
   })
+  const supportTicketsRef = useRef<SupportTicketsPanelHandle | null>(null)
 
   async function handleLogout() {
     await signOut()
@@ -71,6 +73,11 @@ export function DashboardHeader({
 
   function closeMobileMenu() {
     setIsMobileMenuOpen(false)
+  }
+
+  function openHelpDialog() {
+    setIsHelpOpen(true)
+    void supportTicketsRef.current?.reload()
   }
 
   async function handleCheckout(packId: string) {
@@ -141,7 +148,7 @@ export function DashboardHeader({
             </button>
             <button
               type="button"
-              onClick={() => setIsHelpOpen(true)}
+              onClick={openHelpDialog}
               className="text-sm text-foreground/80 transition hover:text-foreground"
             >
               Ajuda
@@ -232,7 +239,7 @@ export function DashboardHeader({
                 type="button"
                 onClick={() => {
                   closeMobileMenu()
-                  setIsHelpOpen(true)
+                  openHelpDialog()
                 }}
                 className="rounded-2xl border border-border/60 bg-white/80 px-4 py-3 text-left text-sm text-foreground transition hover:border-[#5de0e6]/60"
               >
@@ -380,7 +387,15 @@ export function DashboardHeader({
         </DialogContent>
       </Dialog>
 
-      <Dialog open={isHelpOpen} onOpenChange={setIsHelpOpen}>
+      <Dialog
+        open={isHelpOpen}
+        onOpenChange={(open) => {
+          setIsHelpOpen(open)
+          if (open) {
+            void supportTicketsRef.current?.reload()
+          }
+        }}
+      >
         <DialogContent className="max-w-2xl rounded-[28px] border-border/60 bg-background p-0 shadow-2xl">
           <div className="p-6 sm:p-7">
             <DialogHeader>
@@ -449,6 +464,8 @@ export function DashboardHeader({
                 </Link>
               </DialogFooter>
             </div>
+
+            <SupportTicketsPanel ref={supportTicketsRef} />
           </div>
         </DialogContent>
       </Dialog>
