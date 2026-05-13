@@ -7,7 +7,7 @@ import { createSupabaseAdminClient } from "@/lib/supabase/server"
 const payloadSchema = z.object({
   category: z.enum(supportTicketCategories),
   subject: z.string().trim().max(120).optional().or(z.literal("")),
-  message: z.string().trim().min(10).max(2000),
+  message: z.string().trim().min(1).max(2000),
   related_search_id: z.string().uuid().optional().nullable(),
   related_payment_id: z.string().uuid().optional().nullable(),
 })
@@ -99,6 +99,30 @@ export async function POST(request: Request) {
 
   const parsed = payloadSchema.safeParse(body)
 
+  console.log("SUPPORT_TICKET_PAYLOAD", {
+    body,
+    parsed: parsed.success
+      ? {
+          category: parsed.data.category,
+          subject: parsed.data.subject ?? null,
+          messageLength: parsed.data.message.length,
+          related_search_id: parsed.data.related_search_id ?? null,
+          related_payment_id: parsed.data.related_payment_id ?? null,
+        }
+      : {
+          issues: parsed.error.issues.map((issue) => ({
+            path: issue.path.join("."),
+            message: issue.message,
+          })),
+        },
+  })
+
+  console.log("SUPPORT_TICKET_USER", {
+    user_id: session.userId,
+    email: session.email ?? null,
+    isAuthenticated: session.isAuthenticated,
+  })
+
   if (!parsed.success) {
     return jsonError("Dados inválidos para abrir chamado.", 400, parsed.error.message)
   }
@@ -106,6 +130,7 @@ export async function POST(request: Request) {
   const subject = parsed.data.subject?.trim() ? parsed.data.subject.trim() : null
   const relatedSearchId = parsed.data.related_search_id ?? null
   const relatedPaymentId = parsed.data.related_payment_id ?? null
+  const message = parsed.data.message.trim()
 
   const supabase = createSupabaseAdminClient()
   const relationValidation = await validateRelatedEntities({
@@ -123,10 +148,10 @@ export async function POST(request: Request) {
     .from("support_tickets")
     .insert({
       user_id: session.userId,
-      email: session.email,
+      email: session.email ?? null,
       category: parsed.data.category,
       subject,
-      message: parsed.data.message.trim(),
+      message,
       status: "open",
       priority: "normal",
       related_search_id: relatedSearchId,
@@ -136,7 +161,17 @@ export async function POST(request: Request) {
     .single()
 
   if (error || !data) {
-    console.error("SUPPORT TICKET CREATE ERROR", error)
+    console.error("SUPPORT_TICKET_INSERT_ERROR", {
+      message: error?.message,
+      code: error?.code,
+      details: error?.details,
+      hint: error?.hint,
+      user_id: session.userId,
+      email: session.email ?? null,
+      category: parsed.data.category,
+      subject,
+      messageLength: message.length,
+    })
     return jsonError("Não foi possível abrir seu chamado agora.", 500)
   }
 
