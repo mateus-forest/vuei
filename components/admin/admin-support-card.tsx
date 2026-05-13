@@ -177,9 +177,9 @@ export function AdminSupportCard({ support }: { support: AdminSupportData }) {
           }
         }}
       >
-        <DialogContent className="max-h-[90dvh] max-w-2xl overflow-hidden rounded-[28px] border-border/60 bg-background p-0 shadow-2xl">
-          <div className="overflow-y-auto p-6 sm:p-7">
-            <DialogHeader>
+        <DialogContent className="flex max-h-[85dvh] max-w-2xl flex-col overflow-hidden rounded-[28px] border-border/60 bg-background p-0 shadow-2xl sm:max-h-[90dvh]">
+          <div className="flex min-h-0 flex-1 flex-col">
+            <DialogHeader className="shrink-0 px-6 pt-6 sm:px-7 sm:pt-7">
               <DialogTitle className="flex items-center gap-2 font-heading text-2xl text-foreground">
                 <Ticket className="size-5 text-[#004aad]" />
                 Atualizar chamado
@@ -190,7 +190,8 @@ export function AdminSupportCard({ support }: { support: AdminSupportData }) {
             </DialogHeader>
 
             {selectedTicket && editState ? (
-              <div className="mt-6 space-y-4">
+              <div className="min-h-0 flex-1 overflow-y-auto px-6 pb-6 pt-6 sm:px-7 sm:pb-7">
+                <div className="space-y-4 pb-4">
                 <div className="rounded-2xl border border-border/60 bg-white/80 px-4 py-4 text-sm text-muted-foreground">
                   <div className="font-medium text-foreground">{selectedTicket.email ?? "Sem e-mail"}</div>
                   <div className="mt-1">{getSupportTicketCategoryLabel(selectedTicket.category)}</div>
@@ -297,9 +298,10 @@ export function AdminSupportCard({ support }: { support: AdminSupportData }) {
                   </div>
                 ) : null}
               </div>
+              </div>
             ) : null}
 
-            <DialogFooter className="mt-6">
+            <DialogFooter className="shrink-0 border-t border-border/60 bg-background px-6 py-4 sm:px-7">
               <button
                 type="button"
                 onClick={() => {
