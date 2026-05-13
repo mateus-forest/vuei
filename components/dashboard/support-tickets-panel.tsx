@@ -1,7 +1,7 @@
 "use client"
 
-import { forwardRef, type FormEvent, useImperativeHandle, useState } from "react"
-import { AlertCircle, LifeBuoy } from "lucide-react"
+import { type FormEvent, useEffect, useState } from "react"
+import { AlertCircle, LifeBuoy, MessageSquareText } from "lucide-react"
 import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
 import { supportTicketCategories } from "@/lib/services/support-service"
@@ -24,11 +24,7 @@ const initialForm = {
   message: "",
 }
 
-export type SupportTicketsPanelHandle = {
-  reload: () => Promise<void>
-}
-
-export const SupportTicketsPanel = forwardRef<SupportTicketsPanelHandle>(function SupportTicketsPanel(_, ref) {
+export function SupportTicketsPanel({ isOpen }: { isOpen: boolean }) {
   const [form, setForm] = useState(initialForm)
   const [tickets, setTickets] = useState<SupportTicketRow[]>([])
   const [hasLoaded, setHasLoaded] = useState(false)
@@ -61,15 +57,17 @@ export const SupportTicketsPanel = forwardRef<SupportTicketsPanelHandle>(functio
     }
   }
 
-  useImperativeHandle(
-    ref,
-    () => ({
-      reload: async () => {
-        await loadTickets()
-      },
-    }),
-    [],
-  )
+  useEffect(() => {
+    if (!isOpen) {
+      return
+    }
+
+    const timeoutId = window.setTimeout(() => {
+      void loadTickets()
+    }, 0)
+
+    return () => window.clearTimeout(timeoutId)
+  }, [isOpen])
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
@@ -138,7 +136,7 @@ export const SupportTicketsPanel = forwardRef<SupportTicketsPanelHandle>(functio
             value={form.subject}
             maxLength={120}
             onChange={(event) => setForm((current) => ({ ...current, subject: event.target.value }))}
-            placeholder="Resumo rápido do problema"
+            placeholder="Resumo rapido do problema"
           />
         </label>
 
@@ -148,7 +146,7 @@ export const SupportTicketsPanel = forwardRef<SupportTicketsPanelHandle>(functio
             value={form.message}
             maxLength={2000}
             onChange={(event) => setForm((current) => ({ ...current, message: event.target.value }))}
-            placeholder="Explique o que aconteceu, quando ocorreu e o que você esperava ver."
+            placeholder="Explique o que aconteceu, quando ocorreu e o que voce esperava ver."
             className="min-h-28"
           />
         </label>
@@ -182,11 +180,11 @@ export const SupportTicketsPanel = forwardRef<SupportTicketsPanelHandle>(functio
         <div className="mt-4 space-y-3">
           {!hasLoaded ? (
             <div className="rounded-2xl border border-border/60 px-4 py-4 text-sm text-muted-foreground">
-              Abra a ajuda para carregar seus chamados.
+              Carregando chamados...
             </div>
           ) : tickets.length === 0 ? (
             <div className="rounded-2xl border border-border/60 px-4 py-4 text-sm text-muted-foreground">
-              Você ainda não abriu chamados.
+              Você ainda não possui chamados.
             </div>
           ) : (
             tickets.map((ticket) => (
@@ -198,6 +196,20 @@ export const SupportTicketsPanel = forwardRef<SupportTicketsPanelHandle>(functio
                       {getSupportTicketCategoryLabel(ticket.category)} • {getSupportTicketStatusLabel(ticket.status)} •{" "}
                       {formatShortDate(ticket.created_at)}
                     </div>
+                    {ticket.customer_message ? (
+                      <div className="mt-3 rounded-2xl border border-border/60 bg-secondary/35 px-4 py-3">
+                        <div className="flex items-center gap-2 text-xs font-medium text-foreground">
+                          <MessageSquareText className="size-4 text-[#004aad]" />
+                          Resposta do suporte
+                        </div>
+                        <div className="mt-2 text-sm text-muted-foreground">{ticket.customer_message}</div>
+                        {ticket.customer_message_at ? (
+                          <div className="mt-2 text-xs text-muted-foreground">
+                            {formatShortDate(ticket.customer_message_at)}
+                          </div>
+                        ) : null}
+                      </div>
+                    ) : null}
                   </div>
                 </div>
               </div>
@@ -207,4 +219,4 @@ export const SupportTicketsPanel = forwardRef<SupportTicketsPanelHandle>(functio
       </div>
     </div>
   )
-})
+}

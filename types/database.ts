@@ -94,6 +94,8 @@ export type SupportTicketRow = {
   related_search_id: string | null
   related_payment_id: string | null
   admin_note: string | null
+  customer_message: string | null
+  customer_message_at: string | null
   created_at: string
   updated_at: string
   resolved_at: string | null

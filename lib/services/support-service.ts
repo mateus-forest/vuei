@@ -28,6 +28,8 @@ export function mapSupportTicketRow(row: SupportTicketRow): SupportTicket {
     relatedSearchId: row.related_search_id,
     relatedPaymentId: row.related_payment_id,
     adminNote: row.admin_note,
+    customerMessage: row.customer_message,
+    customerMessageAt: row.customer_message_at,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
     resolvedAt: row.resolved_at,

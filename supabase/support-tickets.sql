@@ -12,6 +12,8 @@ create table if not exists public.support_tickets (
   related_search_id uuid references public.searches(id) on delete set null,
   related_payment_id uuid references public.payments(id) on delete set null,
   admin_note text null,
+  customer_message text null,
+  customer_message_at timestamptz null,
   created_at timestamptz default now(),
   updated_at timestamptz default now(),
   resolved_at timestamptz null,
@@ -31,6 +33,12 @@ create table if not exists public.support_tickets (
 );
 
 alter table public.support_tickets enable row level security;
+
+alter table public.support_tickets
+add column if not exists customer_message text;
+
+alter table public.support_tickets
+add column if not exists customer_message_at timestamptz;
 
 grant usage on schema public to anon, authenticated, service_role;
 grant select, insert on table public.support_tickets to authenticated;

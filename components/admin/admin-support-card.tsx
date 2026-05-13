@@ -23,6 +23,8 @@ type SupportEditState = {
   status: SupportTicket["status"]
   priority: SupportTicket["priority"]
   adminNote: string
+  customerMessage: string
+  courtesyCredits: string
 }
 
 function buildEditState(ticket: SupportTicket): SupportEditState {
@@ -30,13 +32,20 @@ function buildEditState(ticket: SupportTicket): SupportEditState {
     status: ticket.status,
     priority: ticket.priority,
     adminNote: ticket.adminNote ?? "",
+    customerMessage: ticket.customerMessage ?? "",
+    courtesyCredits: "",
   }
+}
+
+function formatResolvedDate(ticket: SupportTicket) {
+  return ticket.customerMessageAt ? formatShortDate(ticket.customerMessageAt) : null
 }
 
 export function AdminSupportCard({ support }: { support: AdminSupportData }) {
   const [selectedTicket, setSelectedTicket] = useState<SupportTicket | null>(null)
   const [editState, setEditState] = useState<SupportEditState | null>(null)
   const [feedbackMessage, setFeedbackMessage] = useState("")
+  const [isSaving, setIsSaving] = useState(false)
   const [isPending, startTransition] = useTransition()
   const router = useRouter()
 
@@ -47,11 +56,23 @@ export function AdminSupportCard({ support }: { support: AdminSupportData }) {
   }
 
   async function handleSave() {
-    if (!selectedTicket || !editState) {
+    if (!selectedTicket || !editState || isSaving) {
+      return
+    }
+
+    const courtesyCredits = editState.courtesyCredits.trim()
+    const parsedCourtesyCredits = courtesyCredits ? Number.parseInt(courtesyCredits, 10) : null
+
+    if (
+      courtesyCredits &&
+      (parsedCourtesyCredits === null || !Number.isInteger(parsedCourtesyCredits) || parsedCourtesyCredits <= 0)
+    ) {
+      setFeedbackMessage("Informe uma quantidade valida de creditos de cortesia.")
       return
     }
 
     setFeedbackMessage("")
+    setIsSaving(true)
 
     try {
       const response = await fetch(`/api/admin/support/tickets/${selectedTicket.id}`, {
@@ -63,13 +84,15 @@ export function AdminSupportCard({ support }: { support: AdminSupportData }) {
           status: editState.status,
           priority: editState.priority,
           admin_note: editState.adminNote,
+          customer_message: editState.customerMessage,
+          courtesy_credits: parsedCourtesyCredits,
         }),
       })
 
       const payload = (await response.json().catch(() => null)) as AdminSupportActionResponse | null
 
       if (!response.ok || !payload?.ok) {
-        setFeedbackMessage((payload && !payload.ok && payload.error) || "Não foi possível atualizar o chamado agora.")
+        setFeedbackMessage((payload && !payload.ok && payload.error) || "Nao foi possivel atualizar o chamado agora.")
         return
       }
 
@@ -80,7 +103,9 @@ export function AdminSupportCard({ support }: { support: AdminSupportData }) {
       setEditState(null)
     } catch (error) {
       console.error("ADMIN SUPPORT UPDATE ERROR", error)
-      setFeedbackMessage("Não foi possível atualizar o chamado agora.")
+      setFeedbackMessage("Nao foi possivel atualizar o chamado agora.")
+    } finally {
+      setIsSaving(false)
     }
   }
 
@@ -100,7 +125,7 @@ export function AdminSupportCard({ support }: { support: AdminSupportData }) {
             <div className="mt-2 text-2xl font-semibold text-foreground">{support.openCount}</div>
           </div>
           <div className="rounded-2xl border border-border/60 bg-white/80 px-4 py-4">
-            <div className="text-sm text-muted-foreground">Em análise</div>
+            <div className="text-sm text-muted-foreground">Em analise</div>
             <div className="mt-2 text-2xl font-semibold text-foreground">{support.inReviewCount}</div>
           </div>
           <div className="rounded-2xl border border-border/60 bg-white/80 px-4 py-4">
@@ -152,15 +177,15 @@ export function AdminSupportCard({ support }: { support: AdminSupportData }) {
           }
         }}
       >
-        <DialogContent className="max-w-2xl rounded-[28px] border-border/60 bg-background p-0 shadow-2xl">
-          <div className="p-6 sm:p-7">
+        <DialogContent className="max-h-[90dvh] max-w-2xl overflow-hidden rounded-[28px] border-border/60 bg-background p-0 shadow-2xl">
+          <div className="overflow-y-auto p-6 sm:p-7">
             <DialogHeader>
               <DialogTitle className="flex items-center gap-2 font-heading text-2xl text-foreground">
                 <Ticket className="size-5 text-[#004aad]" />
                 Atualizar chamado
               </DialogTitle>
               <DialogDescription className="text-muted-foreground">
-                Ajuste o status, a prioridade e a observação interna do atendimento.
+                Ajuste o atendimento, responda o cliente e aplique cortesia apenas quando necessario.
               </DialogDescription>
             </DialogHeader>
 
@@ -169,8 +194,19 @@ export function AdminSupportCard({ support }: { support: AdminSupportData }) {
                 <div className="rounded-2xl border border-border/60 bg-white/80 px-4 py-4 text-sm text-muted-foreground">
                   <div className="font-medium text-foreground">{selectedTicket.email ?? "Sem e-mail"}</div>
                   <div className="mt-1">{getSupportTicketCategoryLabel(selectedTicket.category)}</div>
+                  <div className="mt-1">{selectedTicket.subject?.trim() || "Chamado sem assunto"}</div>
                   <div className="mt-2 text-foreground">{selectedTicket.message}</div>
                 </div>
+
+                {selectedTicket.customerMessage ? (
+                  <div className="rounded-2xl border border-border/60 bg-secondary/35 px-4 py-4 text-sm">
+                    <div className="font-medium text-foreground">Resposta do suporte atual</div>
+                    <div className="mt-2 whitespace-pre-wrap text-foreground">{selectedTicket.customerMessage}</div>
+                    {formatResolvedDate(selectedTicket) ? (
+                      <div className="mt-2 text-xs text-muted-foreground">{formatResolvedDate(selectedTicket)}</div>
+                    ) : null}
+                  </div>
+                ) : null}
 
                 <div className="grid gap-4 sm:grid-cols-2">
                   <label className="block">
@@ -211,6 +247,19 @@ export function AdminSupportCard({ support }: { support: AdminSupportData }) {
                 </div>
 
                 <label className="block">
+                  <span className="mb-2 block text-sm font-medium text-foreground">Mensagem para o cliente</span>
+                  <Textarea
+                    value={editState.customerMessage}
+                    maxLength={2000}
+                    onChange={(event) =>
+                      setEditState((current) => (current ? { ...current, customerMessage: event.target.value } : current))
+                    }
+                    className="min-h-28"
+                    placeholder="Exemplo: Identificamos o problema e liberamos seus creditos."
+                  />
+                </label>
+
+                <label className="block">
                   <span className="mb-2 block text-sm font-medium text-foreground">Nota interna</span>
                   <Textarea
                     value={editState.adminNote}
@@ -219,8 +268,27 @@ export function AdminSupportCard({ support }: { support: AdminSupportData }) {
                       setEditState((current) => (current ? { ...current, adminNote: event.target.value } : current))
                     }
                     className="min-h-28"
-                    placeholder="Observações internas para acompanhamento do caso."
+                    placeholder="Observacoes internas para acompanhamento do caso."
                   />
+                </label>
+
+                <label className="block">
+                  <span className="mb-2 block text-sm font-medium text-foreground">Adicionar credito de cortesia</span>
+                  <input
+                    type="number"
+                    min="1"
+                    step="1"
+                    inputMode="numeric"
+                    value={editState.courtesyCredits}
+                    onChange={(event) =>
+                      setEditState((current) => (current ? { ...current, courtesyCredits: event.target.value } : current))
+                    }
+                    className="h-12 w-full rounded-2xl border border-border/60 bg-secondary/35 px-4 text-sm outline-none transition focus:border-[#5de0e6]/70"
+                    placeholder="Exemplo: 1"
+                  />
+                  <p className="mt-2 text-xs text-muted-foreground">
+                    Os creditos so serao aplicados se voce preencher uma quantidade positiva e salvar.
+                  </p>
                 </label>
 
                 {feedbackMessage ? (
@@ -246,10 +314,10 @@ export function AdminSupportCard({ support }: { support: AdminSupportData }) {
               <button
                 type="button"
                 onClick={() => void handleSave()}
-                disabled={isPending}
+                disabled={isSaving || isPending}
                 className="inline-flex items-center justify-center rounded-2xl border border-border/60 bg-white/80 px-4 py-3 text-sm font-medium text-foreground transition hover:border-[#5de0e6]/60 disabled:cursor-not-allowed disabled:opacity-60"
               >
-                {isPending ? "Salvando..." : "Salvar atualização"}
+                {isSaving || isPending ? "Salvando..." : "Salvar atualizacao"}
               </button>
             </DialogFooter>
           </div>

@@ -23,6 +23,8 @@ export type SupportTicket = {
   relatedSearchId: string | null
   relatedPaymentId: string | null
   adminNote: string | null
+  customerMessage: string | null
+  customerMessageAt: string | null
   createdAt: string
   updatedAt: string
   resolvedAt: string | null

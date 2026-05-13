@@ -1,6 +1,6 @@
 ﻿"use client"
 
-import { useRef, useState } from "react"
+import { useState } from "react"
 import Image from "next/image"
 import Link from "next/link"
 import { CreditCard, HelpCircle, History, Home, LogOut, Menu, Shield, User, X } from "lucide-react"
@@ -18,7 +18,7 @@ import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
-import { SupportTicketsPanel, type SupportTicketsPanelHandle } from "@/components/dashboard/support-tickets-panel"
+import { SupportTicketsPanel } from "@/components/dashboard/support-tickets-panel"
 
 function formatCreditDelta(value: number) {
   return `${value > 0 ? "+" : ""}${value}`
@@ -51,8 +51,6 @@ export function DashboardHeader({
     newPassword: "",
     confirmPassword: "",
   })
-  const supportTicketsRef = useRef<SupportTicketsPanelHandle | null>(null)
-
   async function handleLogout() {
     await signOut()
     window.location.href = "/"
@@ -77,7 +75,6 @@ export function DashboardHeader({
 
   function openHelpDialog() {
     setIsHelpOpen(true)
-    void supportTicketsRef.current?.reload()
   }
 
   async function handleCheckout(packId: string) {
@@ -389,12 +386,7 @@ export function DashboardHeader({
 
       <Dialog
         open={isHelpOpen}
-        onOpenChange={(open) => {
-          setIsHelpOpen(open)
-          if (open) {
-            void supportTicketsRef.current?.reload()
-          }
-        }}
+        onOpenChange={setIsHelpOpen}
       >
         <DialogContent className="flex max-h-[90dvh] max-w-2xl flex-col overflow-hidden rounded-[28px] border-border/60 bg-background p-0 shadow-2xl">
           <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain p-6 sm:p-7">
@@ -465,7 +457,7 @@ export function DashboardHeader({
               </DialogFooter>
             </div>
 
-            <SupportTicketsPanel ref={supportTicketsRef} />
+            <SupportTicketsPanel isOpen={isHelpOpen} />
           </div>
         </DialogContent>
       </Dialog>

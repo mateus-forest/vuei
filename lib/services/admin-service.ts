@@ -290,7 +290,7 @@ async function listAdminPayments() {
     const supabase = createSupabaseAdminClient()
     const { data, error } = await supabase
       .from("payments")
-      .select("id,user_id,email,amount_cents,created_at,status,credits,plan")
+      .select("id,user_id,email,amount_cents,created_at,status,credits,plan,credits_applied")
       .order("created_at", { ascending: false })
 
     if (error || !data) {
@@ -299,7 +299,10 @@ async function listAdminPayments() {
     }
 
     return data as Array<
-      Pick<PaymentRow, "id" | "user_id" | "email" | "amount_cents" | "created_at" | "status" | "credits" | "plan">
+      Pick<
+        PaymentRow,
+        "id" | "user_id" | "email" | "amount_cents" | "created_at" | "status" | "credits" | "plan" | "credits_applied"
+      >
     >
   } catch (error) {
     logAdminQueryError("payments", {
@@ -335,25 +338,20 @@ async function listAdminSupportTickets() {
 }
 
 export async function getAdminFinanceData(): Promise<AdminFinanceData> {
-  const [payments, creditTransactions, users] = await Promise.all([
+  const [payments, users] = await Promise.all([
     listAdminPayments().catch(() => []),
-    listAdminCreditTransactions().catch(() => []),
     listAdminUsers().catch(() => []),
   ])
 
   const userLabels = new Map(users.map((user) => [user.id, user.email]))
   const paidPayments = payments.filter((payment) => isPaidPaymentStatus(payment.status))
   const recentPurchases = paidPayments.slice(0, 10).map((payment) => mapPaymentToAdminPurchase(payment, userLabels))
-
-  const soldCreditsFromTransactions = creditTransactions
-    .filter((transaction) => transaction.type === "purchase" && transaction.credits > 0)
-    .reduce((total, transaction) => total + transaction.credits, 0)
-
-  const soldCreditsFromPayments = paidPayments.reduce((total, payment) => total + Math.max(payment.credits ?? 0, 0), 0)
+  const creditedPaidPayments = paidPayments.filter((payment) => payment.credits_applied)
+  const soldCredits = creditedPaidPayments.reduce((total, payment) => total + Math.max(payment.credits ?? 0, 0), 0)
 
   return {
     paymentsCount: paidPayments.length,
-    soldCredits: soldCreditsFromTransactions || soldCreditsFromPayments,
+    soldCredits,
     estimatedRevenueCents: paidPayments.reduce((total, payment) => total + Math.max(payment.amount_cents ?? 0, 0), 0),
     recentPurchases,
   }
