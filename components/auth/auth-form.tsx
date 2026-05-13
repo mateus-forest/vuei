@@ -82,12 +82,6 @@ export function AuthForm({ mode }: { mode: "login" | "signup" }) {
       return storedDestination
     }
 
-    const authUser = { id: userId, email: userEmail ?? null }
-
-    console.log("AUTH USER:", authUser)
-    console.log("USER ID:", userId)
-    console.log("USER EMAIL:", userEmail ?? null)
-
     try {
       const response = await fetch("/api/auth/me", {
         method: "GET",
@@ -103,29 +97,19 @@ export function AuthForm({ mode }: { mode: "login" | "signup" }) {
 
       const profile = payload?.profile ?? null
 
-      console.log("PROFILE RESULT:", profile)
-      console.log("ROLE:", profile?.role)
-
       if (!response.ok) {
-        console.error("PROFILE QUERY ERROR:", payload)
-        console.log("REDIRECT TARGET:", "/dashboard")
         return "/dashboard"
       }
 
       if (!profile) {
-        console.error("PROFILE NOT FOUND FOR USER:", userId)
-        console.log("REDIRECT TARGET:", "/dashboard")
         return "/dashboard"
       }
 
       const target = profile.role === "admin" ? "/admin" : "/dashboard"
 
-      console.log("REDIRECT TARGET:", target)
-
       return target
     } catch (error) {
       console.error("PROFILE QUERY ERROR:", error)
-      console.log("REDIRECT TARGET:", "/dashboard")
       return "/dashboard"
     }
   }

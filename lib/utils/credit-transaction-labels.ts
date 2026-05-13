@@ -13,7 +13,7 @@ function cleanDestination(destination?: string | null) {
     return ""
   }
 
-  return normalizeWhitespace(stripUuid(destination).replace(/^[-:–—\s]+|[-:–—\s]+$/g, ""))
+  return normalizeWhitespace(stripUuid(destination).replace(/^[-:—–\s]+|[-:—–\s]+$/g, ""))
 }
 
 export function getCreditTransactionLabel(type: CreditTransactionType) {

@@ -79,7 +79,9 @@ create or replace function public.create_support_ticket(
   p_email text,
   p_category text,
   p_subject text,
-  p_message text
+  p_message text,
+  p_related_search_id uuid default null,
+  p_related_payment_id uuid default null
 )
 returns public.support_tickets
 language plpgsql
@@ -95,6 +97,8 @@ begin
     category,
     subject,
     message,
+    related_search_id,
+    related_payment_id,
     status,
     priority
   )
@@ -104,6 +108,8 @@ begin
     p_category,
     nullif(trim(coalesce(p_subject, '')), ''),
     trim(p_message),
+    p_related_search_id,
+    p_related_payment_id,
     'open',
     'normal'
   )
@@ -114,7 +120,7 @@ begin
 end;
 $$;
 
-grant execute on function public.create_support_ticket(uuid, text, text, text, text) to service_role;
+grant execute on function public.create_support_ticket(uuid, text, text, text, text, uuid, uuid) to service_role;
 
 create or replace function public.support_tickets_debug_check()
 returns table (

@@ -326,7 +326,8 @@ export async function POST(req: Request) {
       eventId: event.id,
       stripeSessionId,
       paymentStatus,
-      metadata: session.metadata ?? null,
+      plan: session.metadata?.plan ?? null,
+      credits: session.metadata?.credits ?? null,
     })
 
     if (!stripeSessionId) {

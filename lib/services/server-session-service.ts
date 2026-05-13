@@ -17,17 +17,7 @@ export async function getServerSession(options?: { includeRole?: boolean }): Pro
     if (options?.includeRole) {
       try {
         const adminClient = createSupabaseAdminClient()
-        const { data: profile, error } = await adminClient
-          .from("profiles")
-          .select("id, email, role")
-          .eq("id", user.id)
-          .maybeSingle()
-
-        console.log("AUTH USER ID:", user.id)
-        console.log("AUTH USER EMAIL:", user.email ?? null)
-        console.log("PROFILE QUERY DATA:", profile)
-        console.log("PROFILE QUERY ERROR:", error)
-        console.log("PROFILE ROLE:", profile?.role)
+        const { data: profile } = await adminClient.from("profiles").select("id, role").eq("id", user.id).maybeSingle()
 
         if (profile?.role === "admin") {
           role = "admin"

@@ -1,8 +1,8 @@
 import { NextResponse } from "next/server"
 import { z } from "zod"
-import { createSupabaseServerClient } from "@/lib/supabase/server"
 import { getStripeServerClient } from "@/lib/stripe/server"
 import { getAppBaseUrl, getStripePlanConfig, normalizeStripePlanId } from "@/lib/services/billing-service"
+import { createSupabaseServerClient } from "@/lib/supabase/server"
 
 export const runtime = "nodejs"
 export const dynamic = "force-dynamic"
@@ -30,8 +30,6 @@ function jsonError(error: string, code: string, status: number, detail?: string)
 export async function POST(request: Request) {
   let json: unknown
 
-  console.log("CHECKOUT RUNTIME", runtime)
-
   try {
     json = await request.json()
   } catch (error) {
@@ -50,12 +48,6 @@ export async function POST(request: Request) {
   const plan = normalizedPlanId ? getStripePlanConfig(normalizedPlanId) : null
   const hasStripeSecretKey = Boolean(process.env.STRIPE_SECRET_KEY)
   const appUrl = getAppBaseUrl()
-
-  console.log("CHECKOUT PLAN REQUESTED", requestedPlanId)
-  console.log("CHECKOUT PLAN NORMALIZED", normalizedPlanId)
-  console.log("CHECKOUT PRICE ID", plan?.priceId ?? null)
-  console.log("CHECKOUT STRIPE SECRET CONFIGURED", hasStripeSecretKey)
-  console.log("CHECKOUT APP URL", appUrl)
 
   if (!plan || !plan.priceId) {
     return jsonError("Pacote de créditos ainda não configurado.", "INVALID_PLAN", 400)
@@ -111,11 +103,7 @@ export async function POST(request: Request) {
     const stripeError = error as StripeLikeError
 
     console.error("CHECKOUT ERROR", {
-      runtime,
-      stripeSecretConfigured: hasStripeSecretKey,
-      requestedPlanId,
       normalizedPlanId,
-      priceId: plan.priceId,
       message: stripeError?.message,
       type: stripeError?.type,
       code: stripeError?.code,

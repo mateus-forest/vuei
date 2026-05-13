@@ -99,30 +99,6 @@ export async function POST(request: Request) {
 
   const parsed = payloadSchema.safeParse(body)
 
-  console.log("SUPPORT_TICKET_PAYLOAD", {
-    body,
-    parsed: parsed.success
-      ? {
-          category: parsed.data.category,
-          subject: parsed.data.subject ?? null,
-          messageLength: parsed.data.message.length,
-          related_search_id: parsed.data.related_search_id ?? null,
-          related_payment_id: parsed.data.related_payment_id ?? null,
-        }
-      : {
-          issues: parsed.error.issues.map((issue) => ({
-            path: issue.path.join("."),
-            message: issue.message,
-          })),
-        },
-  })
-
-  console.log("SUPPORT_TICKET_USER", {
-    user_id: session.userId,
-    email: session.email ?? null,
-    isAuthenticated: session.isAuthenticated,
-  })
-
   if (!parsed.success) {
     return jsonError("Dados inválidos para abrir chamado.", 400, parsed.error.message)
   }
@@ -144,14 +120,15 @@ export async function POST(request: Request) {
     return jsonError(relationValidation.error, 400)
   }
 
-  const { data, error } = await supabase
-    .rpc("create_support_ticket", {
-      p_user_id: session.userId,
-      p_email: session.email ?? null,
-      p_category: parsed.data.category,
-      p_subject: subject,
-      p_message: message,
-    })
+  const { data, error } = await supabase.rpc("create_support_ticket", {
+    p_user_id: session.userId,
+    p_email: session.email ?? null,
+    p_category: parsed.data.category,
+    p_subject: subject,
+    p_message: message,
+    p_related_search_id: relatedSearchId,
+    p_related_payment_id: relatedPaymentId,
+  })
 
   if (error || !data) {
     console.error("SUPPORT_TICKET_INSERT_ERROR", {
@@ -159,8 +136,6 @@ export async function POST(request: Request) {
       code: error?.code,
       details: error?.details,
       hint: error?.hint,
-      user_id: session.userId,
-      email: session.email ?? null,
       category: parsed.data.category,
       subject,
       messageLength: message.length,

@@ -1179,8 +1179,8 @@ function buildFallbackTripResult(origin: TripOrigin): TripResult {
     currency: "BRL",
     context:
       origin === "quiz"
-        ? "Fallback mockado do quiz enquanto a integração com IA ainda não existe."
-        : "Fallback mockado da busca enquanto a integração com IA ainda não existe.",
+        ? "Estimativa inicial do quiz gerada com fallback local seguro."
+        : "Estimativa inicial da busca gerada com fallback local seguro.",
   }
 }
 
@@ -1428,7 +1428,7 @@ function resolveAIError(error: unknown) {
   if (status === 429 || message.toLowerCase().includes("quota")) {
     return {
       status: 429,
-      message: "Não foi possível gerar sua viagem agora. Verifique a cota da OpenAI ou tente novamente mais tarde.",
+      message: "Não foi possível gerar sua viagem agora. Tente novamente em alguns instantes.",
     }
   }
 
@@ -1446,7 +1446,7 @@ function resolveAIError(error: unknown) {
   if (message.includes("OPENAI_API_KEY")) {
     return {
       status: 503,
-      message: "Não foi possível gerar sua viagem agora. Revise a configuração da OpenAI no servidor.",
+      message: "Não foi possível gerar sua viagem agora. Tente novamente em instantes.",
     }
   }
 
@@ -1664,8 +1664,8 @@ ${backendPresentationContext}`,
     console.info("OpenAI raw response", {
       elapsedMs: Date.now() - openaiStartedAt,
       responseId: "id" in response ? response.id : undefined,
-      rawResponse: rawAIResponse,
       responseLength: rawAIResponse.length,
+      hasContent: Boolean(rawAIResponse.trim()),
     })
 
     if (!rawAIResponse.trim()) {
@@ -1678,8 +1678,8 @@ ${backendPresentationContext}`,
     console.error("OpenAI parse/call failed", {
       elapsedMs: Date.now() - openaiStartedAt,
       error,
-      rawResponse: rawAIResponse,
       rawResponseLength: rawAIResponse.length,
+      hasRawResponse: Boolean(rawAIResponse.trim()),
     })
     return buildResilientFallbackTripResult(request)
   } finally {
@@ -1733,7 +1733,7 @@ export async function generateAndPersistTrip({
       ok: false as const,
       status: 503,
       error: "SUPABASE_NOT_CONFIGURED",
-      message: "Não foi possível salvar sua viagem agora. Revise a configuração do Supabase no servidor.",
+      message: "Não foi possível salvar sua viagem agora. Tente novamente em instantes.",
     }
   }
 
@@ -2025,5 +2025,8 @@ export function generateTripFromQuiz(answers: QuizAnswer): TripResult {
     },
   )
 }
+
+
+
 
 

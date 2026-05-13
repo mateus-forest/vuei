@@ -15,23 +15,17 @@ export async function GET() {
   }
 
   const supabase = createSupabaseAdminClient()
-  const { data: profile, error } = await supabase
+  const { data: profile } = await supabase
     .from("profiles")
     .select("id, email, role")
     .eq("id", session.userId)
     .maybeSingle()
-
-  console.log("AUTH USER ID:", session.userId)
-  console.log("AUTH USER EMAIL:", session.email)
-  console.log("PROFILE QUERY DATA:", profile)
-  console.log("PROFILE QUERY ERROR:", error)
-  console.log("PROFILE ROLE:", profile?.role)
 
   const user = await getCurrentUser(session)
 
   return NextResponse.json({
     session,
     user,
-    profile,
+    profile: profile ?? null,
   })
 }
