@@ -295,8 +295,8 @@ export function DashboardHeader({
       </Dialog>
 
       <Dialog open={isCreditsOpen} onOpenChange={setIsCreditsOpen}>
-        <DialogContent className="flex max-h-[85vh] max-w-2xl flex-col overflow-hidden rounded-[28px] border-border/60 bg-background p-0 shadow-2xl sm:max-h-[90vh]">
-          <div className="min-h-0 flex-1 overflow-y-auto p-6 pb-8 sm:p-7 sm:pb-10">
+        <DialogContent className="flex max-h-[90dvh] max-w-2xl flex-col overflow-hidden rounded-[28px] border-border/60 bg-background p-0 shadow-2xl">
+          <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain p-6 pb-8 sm:p-7 sm:pb-10">
             <DialogHeader>
               <DialogTitle className="flex items-center gap-2 font-heading text-2xl text-foreground">
                 <CreditCard className="size-5 text-[#004aad]" />
@@ -396,8 +396,8 @@ export function DashboardHeader({
           }
         }}
       >
-        <DialogContent className="max-w-2xl rounded-[28px] border-border/60 bg-background p-0 shadow-2xl">
-          <div className="p-6 sm:p-7">
+        <DialogContent className="flex max-h-[90dvh] max-w-2xl flex-col overflow-hidden rounded-[28px] border-border/60 bg-background p-0 shadow-2xl">
+          <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain p-6 sm:p-7">
             <DialogHeader>
               <DialogTitle className="flex items-center gap-2 font-heading text-2xl text-foreground">
                 <HelpCircle className="size-5 text-[#004aad]" />
