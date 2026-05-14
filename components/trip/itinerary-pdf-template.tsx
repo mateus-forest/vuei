@@ -1,5 +1,7 @@
 "use client"
 
+import { useMemo, useState } from "react"
+import type { CSSProperties, ReactNode } from "react"
 import type { TripResult } from "@/types/trip"
 
 type PdfBreakdownItem = {
@@ -12,6 +14,119 @@ type PdfDetailedDay = {
   title: string
   description: string
   tips: string[]
+}
+
+function normalizePdfText(value: string) {
+  return value
+    .replace(/Ã¡/g, "á")
+    .replace(/Ã /g, "à")
+    .replace(/Ã¢/g, "â")
+    .replace(/Ã£/g, "ã")
+    .replace(/Ã©/g, "é")
+    .replace(/Ãª/g, "ê")
+    .replace(/Ã­/g, "í")
+    .replace(/Ã³/g, "ó")
+    .replace(/Ã´/g, "ô")
+    .replace(/Ãµ/g, "õ")
+    .replace(/Ãº/g, "ú")
+    .replace(/Ã§/g, "ç")
+    .replace(/Ã/g, "Á")
+    .replace(/Ã€/g, "À")
+    .replace(/Ã‚/g, "Â")
+    .replace(/Ãƒ/g, "Ã")
+    .replace(/Ã‰/g, "É")
+    .replace(/ÃŠ/g, "Ê")
+    .replace(/Ã/g, "Í")
+    .replace(/Ã“/g, "Ó")
+    .replace(/Ã”/g, "Ô")
+    .replace(/Ã•/g, "Õ")
+    .replace(/Ãš/g, "Ú")
+    .replace(/Ã‡/g, "Ç")
+    .replace(/â€“/g, "–")
+    .replace(/â€”/g, "—")
+    .replace(/â€¢/g, "•")
+    .replace(/â€œ|â€/g, '"')
+    .replace(/â€˜|â€™/g, "'")
+    .replace(/�/g, "")
+    .trim()
+}
+
+function buildDaySegments(description: string) {
+  const normalized = normalizePdfText(description)
+  const segments = [
+    { label: "Manhã", match: normalized.match(/Manhã:\s*(.*?)(?=\s*Tarde:|\s*Noite:|$)/i)?.[1]?.trim() ?? "" },
+    { label: "Tarde", match: normalized.match(/Tarde:\s*(.*?)(?=\s*Noite:|$)/i)?.[1]?.trim() ?? "" },
+    { label: "Noite", match: normalized.match(/Noite:\s*(.*)$/i)?.[1]?.trim() ?? "" },
+  ].filter((item) => item.match)
+
+  if (segments.length > 0) {
+    return segments
+  }
+
+  return [{ label: "Plano do dia", match: normalized }]
+}
+
+function sectionTitleStyles(accent: string) {
+  return {
+    badge: {
+      width: "28px",
+      height: "28px",
+      borderRadius: "999px",
+      background: accent,
+      color: "#ffffff",
+      display: "inline-flex",
+      alignItems: "center",
+      justifyContent: "center",
+      fontSize: "12px",
+      fontWeight: 700,
+      flexShrink: 0,
+    },
+    title: {
+      margin: 0,
+      color: "#13304c",
+      fontSize: "20px",
+      fontWeight: 700,
+      lineHeight: 1.2,
+    },
+  }
+}
+
+function PdfSection({
+  index,
+  title,
+  accent,
+  children,
+  keepTogether = true,
+}: {
+  index: number
+  title: string
+  accent: string
+  children: ReactNode
+  keepTogether?: boolean
+}) {
+  const heading = sectionTitleStyles(accent)
+
+  return (
+    <section
+      data-pdf-section={title.toLowerCase().replace(/\s+/g, "-")}
+      data-pdf-keep={keepTogether ? "true" : undefined}
+      style={{
+        background: "#ffffff",
+        border: "1px solid #dbe7f3",
+        borderRadius: "18px",
+        padding: "18px 20px",
+        boxShadow: "0 8px 24px rgba(15, 23, 42, 0.04)",
+        breakInside: keepTogether ? ("avoid" as const) : ("auto" as const),
+        pageBreakInside: keepTogether ? ("avoid" as const) : ("auto" as const),
+      }}
+    >
+      <div style={{ display: "flex", alignItems: "center", gap: "10px", marginBottom: "14px" }}>
+        <span style={heading.badge}>{index}</span>
+        <h2 style={heading.title}>{title}</h2>
+      </div>
+      {children}
+    </section>
+  )
 }
 
 export function ItineraryPdfTemplate({
@@ -61,161 +176,211 @@ export function ItineraryPdfTemplate({
   whyThisTrip: string[]
   attentionPoints: string[]
 }) {
-  const today = new Intl.DateTimeFormat("pt-BR", {
-    day: "2-digit",
-    month: "long",
-    year: "numeric",
-  }).format(new Date())
+  const [logoVisible, setLogoVisible] = useState(true)
+  const today = useMemo(
+    () =>
+      new Intl.DateTimeFormat("pt-BR", {
+        day: "2-digit",
+        month: "long",
+        year: "numeric",
+      }).format(new Date()),
+    [],
+  )
 
-  function normalizePdfText(value: string) {
-    return value
-  }
+  const safeDestination = normalizePdfText(destination || "Destino sugerido")
+  const safeSummary = normalizePdfText(summary || "Roteiro personalizado pronto para consulta.")
+  const safeOriginSubtitle = normalizePdfText(originSubtitle)
+  const safePeriod = normalizePdfText(periodLabel ?? "Período não informado")
+  const safePeriodReason = normalizePdfText(periodReason ?? "Período ainda não definido para a viagem.")
+  const safeDates = normalizePdfText(startDate && endDate ? `${startDate} a ${endDate}` : startDate ?? endDate ?? "Não informado")
+  const safeDuration = normalizePdfText(durationLabel ?? `${durationDays} ${durationDays === 1 ? "dia" : "dias"}`)
+  const normalizedAssumptions = normalizePdfText(assumptions)
 
-  const safePeriod = periodLabel ?? "Período não informado"
-  const safePeriodReason = periodReason ?? "Período ainda não definido para a viagem."
-  const safeDates = startDate && endDate ? `${startDate} a ${endDate}` : startDate ?? endDate ?? "Não informado"
-  const safeDuration = durationLabel ?? `${durationDays} ${durationDays === 1 ? "dia" : "dias"}`
-
-  const printStyles = {
+  const styles: Record<string, CSSProperties> = {
     page: {
       width: "794px",
-      backgroundColor: "#ffffff",
+      minHeight: "1123px",
+      background: "#ffffff",
       color: "#17324d",
-      fontFamily: "Arial, Helvetica, sans-serif",
-      paddingBottom: "28px",
+      fontFamily: '"Arial", "Helvetica", sans-serif',
     },
     hero: {
-      position: "relative" as const,
-      padding: "34px 36px 28px",
-      background: "linear-gradient(90deg, #1fc4dd 0%, #2468f2 100%)",
+      position: "relative",
+      padding: "36px 42px 30px",
+      background: "linear-gradient(135deg, #0f9fd7 0%, #004aad 100%)",
       overflow: "hidden",
     },
-    heroBubble: {
-      position: "absolute" as const,
-      right: "-22px",
-      top: "-26px",
-      width: "132px",
-      height: "132px",
+    heroGlowLarge: {
+      position: "absolute",
+      right: "-36px",
+      top: "-42px",
+      width: "180px",
+      height: "180px",
+      borderRadius: "999px",
+      background: "rgba(255,255,255,0.10)",
+    },
+    heroGlowSmall: {
+      position: "absolute",
+      right: "34px",
+      top: "22px",
+      width: "94px",
+      height: "94px",
       borderRadius: "999px",
       background: "rgba(255,255,255,0.08)",
     },
-    heroBubbleTwo: {
-      position: "absolute" as const,
-      right: "22px",
-      top: "18px",
-      width: "78px",
-      height: "78px",
-      borderRadius: "999px",
-      background: "rgba(255,255,255,0.05)",
+    logoWrap: {
+      display: "flex",
+      justifyContent: "center",
+      marginBottom: "18px",
     },
     logo: {
+      width: "84px",
+      height: "84px",
+      objectFit: "contain",
       display: "block",
-      margin: "0 auto 18px",
-      width: "72px",
-      height: "auto",
     },
-    heroTitle: {
-      color: "#ffffff",
-      textAlign: "center" as const,
-      fontSize: "15px",
-      fontWeight: 700,
-      margin: 0,
-    },
-    heroDate: {
-      color: "rgba(255,255,255,0.92)",
-      textAlign: "center" as const,
-      fontSize: "12px",
-      marginTop: "10px",
-    },
-    body: {
-      padding: "16px",
-      background: "#f8fafc",
-    },
-    card: {
-      background: "#ffffff",
-      border: "1px solid #e3ebf4",
-      borderRadius: "16px",
-      padding: "16px",
-      marginBottom: "14px",
-      boxShadow: "0 1px 2px rgba(15, 23, 42, 0.04)",
-      breakInside: "avoid" as const,
-      pageBreakInside: "avoid" as const,
-    },
-    sectionTitleRow: {
-      display: "flex",
-      alignItems: "center",
-      gap: "8px",
-      marginBottom: "12px",
-    },
-    sectionDot: {
-      width: "18px",
-      height: "18px",
-      borderRadius: "999px",
-      background: "#12b8ea",
-      color: "#ffffff",
+    logoFallback: {
       display: "inline-flex",
       alignItems: "center",
       justifyContent: "center",
+      width: "84px",
+      height: "84px",
+      borderRadius: "24px",
+      background: "rgba(255,255,255,0.14)",
+      color: "#ffffff",
+      fontSize: "28px",
+      fontWeight: 700,
+      letterSpacing: "0.08em",
+    },
+    eyebrow: {
+      margin: 0,
+      textAlign: "center",
+      color: "rgba(255,255,255,0.82)",
+      textTransform: "uppercase",
+      letterSpacing: "0.22em",
       fontSize: "11px",
       fontWeight: 700,
-      flexShrink: 0,
     },
-    sectionTitle: {
-      margin: 0,
-      color: "#15324f",
-      fontSize: "18px",
+    heroTitle: {
+      margin: "10px 0 0",
+      textAlign: "center",
+      color: "#ffffff",
+      fontSize: "28px",
+      fontWeight: 700,
+      lineHeight: 1.2,
+    },
+    heroSubtitle: {
+      margin: "10px auto 0",
+      maxWidth: "520px",
+      textAlign: "center",
+      color: "rgba(255,255,255,0.92)",
+      fontSize: "14px",
+      lineHeight: 1.7,
+    },
+    heroMeta: {
+      marginTop: "18px",
+      textAlign: "center",
+      color: "rgba(255,255,255,0.86)",
+      fontSize: "12px",
+    },
+    body: {
+      padding: "20px",
+      background: "#f4f8fc",
+      display: "grid",
+      gap: "16px",
+    },
+    leadCard: {
+      background: "#ffffff",
+      border: "1px solid #dbe7f3",
+      borderRadius: "18px",
+      padding: "20px",
+      boxShadow: "0 8px 24px rgba(15, 23, 42, 0.04)",
+      breakInside: "avoid",
+      pageBreakInside: "avoid",
+    },
+    quote: {
+      margin: "10px 0 0",
+      color: "#37506c",
+      fontSize: "15px",
+      lineHeight: 1.7,
+      fontStyle: "italic",
+    },
+    metaGrid: {
+      marginTop: "18px",
+      display: "grid",
+      gridTemplateColumns: "repeat(3, 1fr)",
+      gap: "12px",
+    },
+    metaCard: {
+      background: "#f7fbff",
+      border: "1px solid #e2edf7",
+      borderRadius: "14px",
+      padding: "12px 14px",
+      minHeight: "78px",
+    },
+    metaLabel: {
+      color: "#7290ad",
+      fontSize: "10px",
+      letterSpacing: "0.12em",
+      textTransform: "uppercase",
+      marginBottom: "6px",
       fontWeight: 700,
     },
-    paragraph: {
+    metaValue: {
+      color: "#16324d",
+      fontSize: "14px",
+      fontWeight: 700,
+      lineHeight: 1.45,
+    },
+    bodyText: {
       margin: 0,
       color: "#42566f",
       fontSize: "13px",
-      lineHeight: 1.7,
+      lineHeight: 1.75,
     },
-    metaGrid: {
+    costGrid: {
       display: "grid",
-      gridTemplateColumns: "1fr 1fr 1fr",
+      gap: "10px",
+    },
+    costRow: {
+      display: "grid",
+      gridTemplateColumns: "1.2fr 0.85fr 0.75fr",
       gap: "12px",
-      marginTop: "14px",
+      alignItems: "center",
+      background: "#f7fbff",
+      border: "1px solid #e2edf7",
+      borderRadius: "14px",
+      padding: "12px 14px",
+      breakInside: "avoid",
+      pageBreakInside: "avoid",
     },
-    metaItem: {
-      background: "#f7fafc",
-      borderRadius: "12px",
-      padding: "10px 12px",
-      minHeight: "68px",
-    },
-    metaTitle: {
-      color: "#8b9aad",
-      fontSize: "11px",
-      marginBottom: "6px",
-      textTransform: "uppercase" as const,
-      letterSpacing: "0.08em",
-    },
-    metaValue: {
-      color: "#17324d",
+    costValue: {
+      color: "#16324d",
       fontSize: "14px",
       fontWeight: 700,
-      lineHeight: 1.4,
+      textAlign: "right",
     },
-    itineraryGrid: {
+    compactList: {
       display: "grid",
-      gridTemplateColumns: "1fr 1fr",
+      gridTemplateColumns: "repeat(2, 1fr)",
       gap: "10px",
     },
-    itineraryChip: {
+    compactItem: {
       display: "flex",
-      alignItems: "center",
       gap: "10px",
-      borderRadius: "12px",
-      background: "#f7fafc",
-      padding: "12px",
-      minHeight: "48px",
+      alignItems: "flex-start",
+      background: "#f7fbff",
+      border: "1px solid #e2edf7",
+      borderRadius: "14px",
+      padding: "12px 14px",
+      breakInside: "avoid",
+      pageBreakInside: "avoid",
     },
-    itemNumber: {
-      width: "22px",
-      height: "22px",
+    itemIndex: {
+      width: "24px",
+      height: "24px",
       borderRadius: "999px",
-      background: "#12b8ea",
+      background: "#0f9fd7",
       color: "#ffffff",
       display: "inline-flex",
       alignItems: "center",
@@ -223,282 +388,328 @@ export function ItineraryPdfTemplate({
       fontSize: "11px",
       fontWeight: 700,
       flexShrink: 0,
+      marginTop: "1px",
     },
-    itineraryText: {
-      color: "#253b56",
+    compactText: {
+      color: "#29445f",
       fontSize: "12px",
       fontWeight: 600,
-      lineHeight: 1.45,
+      lineHeight: 1.55,
     },
-    fullDay: {
+    dayCard: {
+      display: "grid",
+      gap: "12px",
+      background: "#fcfdff",
+      border: "1px solid #dbe7f3",
+      borderRadius: "16px",
+      padding: "14px 16px",
+      breakInside: "avoid",
+      pageBreakInside: "avoid",
+      marginBottom: "12px",
+    },
+    dayHeader: {
       display: "flex",
       gap: "12px",
-      marginBottom: "14px",
       alignItems: "flex-start",
     },
-    fullDayIcon: {
-      width: "22px",
-      height: "22px",
+    dayNumber: {
+      width: "28px",
+      height: "28px",
       borderRadius: "999px",
-      background: "#12b8ea",
+      background: "#004aad",
       color: "#ffffff",
       display: "inline-flex",
       alignItems: "center",
       justifyContent: "center",
-      fontSize: "11px",
+      fontSize: "12px",
       fontWeight: 700,
       flexShrink: 0,
-      marginTop: "2px",
     },
-    fullDayTitle: {
-      margin: "0 0 4px",
-      color: "#15324f",
-      fontSize: "13px",
+    dayTitle: {
+      margin: "1px 0 0",
+      color: "#13304c",
+      fontSize: "15px",
       fontWeight: 700,
+      lineHeight: 1.35,
     },
-    fullDayText: {
-      margin: 0,
-      color: "#4c5f76",
-      fontSize: "12px",
-      lineHeight: 1.65,
+    segmentGrid: {
+      display: "grid",
+      gap: "8px",
     },
-    list: {
+    segmentCard: {
+      background: "#f7fbff",
+      border: "1px solid #e2edf7",
+      borderRadius: "12px",
+      padding: "10px 12px",
+      breakInside: "avoid",
+      pageBreakInside: "avoid",
+    },
+    segmentLabel: {
+      color: "#004aad",
+      fontSize: "10px",
+      letterSpacing: "0.12em",
+      textTransform: "uppercase",
+      fontWeight: 700,
+      marginBottom: "5px",
+    },
+    bulletList: {
       margin: 0,
       padding: 0,
       listStyle: "none",
       display: "grid",
       gap: "10px",
     },
-    listItem: {
+    bulletItem: {
       display: "flex",
       gap: "10px",
       alignItems: "flex-start",
-      color: "#29506e",
+      background: "#f7fbff",
+      border: "1px solid #e2edf7",
+      borderRadius: "14px",
+      padding: "12px 14px",
+      color: "#2f4863",
       fontSize: "12px",
-      lineHeight: 1.6,
-      background: "#f7fafc",
-      borderRadius: "12px",
-      padding: "12px",
+      lineHeight: 1.65,
+      breakInside: "avoid",
+      pageBreakInside: "avoid",
+    },
+    bulletDot: {
+      width: "22px",
+      height: "22px",
+      borderRadius: "999px",
+      background: "#dff5ff",
+      color: "#0f83b5",
+      display: "inline-flex",
+      alignItems: "center",
+      justifyContent: "center",
+      fontSize: "14px",
+      fontWeight: 700,
+      flexShrink: 0,
+      marginTop: "1px",
+    },
+    warningItem: {
+      display: "flex",
+      gap: "10px",
+      alignItems: "flex-start",
+      background: "#fff8ed",
+      border: "1px solid #f3dfbd",
+      borderRadius: "14px",
+      padding: "12px 14px",
+      color: "#66411c",
+      fontSize: "12px",
+      lineHeight: 1.65,
+      breakInside: "avoid",
+      pageBreakInside: "avoid",
     },
     footer: {
       display: "flex",
       justifyContent: "space-between",
-      gap: "12px",
-      padding: "12px 18px 0",
-      color: "#6f8097",
+      gap: "16px",
+      padding: "8px 24px 24px",
+      color: "#6d8097",
       fontSize: "10px",
-      lineHeight: 1.6,
-      breakInside: "avoid" as const,
-      pageBreakInside: "avoid" as const,
+      lineHeight: 1.7,
+      breakInside: "avoid",
+      pageBreakInside: "avoid",
     },
   }
 
   return (
-    <div data-pdf-root="true" style={printStyles.page}>
-      <div style={printStyles.hero}>
-        <div style={printStyles.heroBubble} />
-        <div style={printStyles.heroBubbleTwo} />
-        <img src="/images/vuei-logo.png" alt="VUEI" style={printStyles.logo} />
-        <p style={printStyles.heroTitle}>Roteiro personalizado gerado com VUEI</p>
-        <div style={printStyles.heroDate}>{today}</div>
-      </div>
+    <div data-pdf-root="true" style={styles.page}>
+      <header style={styles.hero}>
+        <div style={styles.heroGlowLarge} />
+        <div style={styles.heroGlowSmall} />
+        <div style={styles.logoWrap}>
+          {logoVisible ? (
+            <>
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img src="/images/vuei-logo.png" alt="VUEI" style={styles.logo} onError={() => setLogoVisible(false)} />
+            </>
+          ) : (
+            <div style={styles.logoFallback}>V</div>
+          )}
+        </div>
+        <p style={styles.eyebrow}>Roteiro completo VUEI</p>
+        <h1 style={styles.heroTitle}>{safeDestination}</h1>
+        <p style={styles.heroSubtitle}>{safeSummary}</p>
+        <div style={styles.heroMeta}>Gerado em {today}</div>
+      </header>
 
-      <div style={printStyles.body}>
-        <section data-pdf-section="meta" style={printStyles.card}>
-          <div style={printStyles.metaTitle}>{normalizePdfText(originSubtitle)}</div>
-          <p style={{ ...printStyles.paragraph, fontStyle: "italic" }}>{`"${normalizePdfText(summary)}"`}</p>
+      <main style={styles.body}>
+        <section data-pdf-section="meta" data-pdf-keep="true" style={styles.leadCard}>
+          <div style={styles.metaLabel}>{safeOriginSubtitle}</div>
+          <p style={styles.quote}>{`"${safeSummary}"`}</p>
 
-          <div style={printStyles.metaGrid}>
-            <div style={printStyles.metaItem}>
-              <div style={printStyles.metaTitle}>Destino</div>
-              <div style={printStyles.metaValue}>{destination}</div>
+          <div style={styles.metaGrid}>
+            <div style={styles.metaCard}>
+              <div style={styles.metaLabel}>Destino</div>
+              <div style={styles.metaValue}>{safeDestination}</div>
             </div>
-            <div style={printStyles.metaItem}>
-              <div style={printStyles.metaTitle}>{isSuggestedPeriod ? "Período recomendado" : "Período informado"}</div>
-              <div style={printStyles.metaValue}>{safePeriod}</div>
+            <div style={styles.metaCard}>
+              <div style={styles.metaLabel}>{isSuggestedPeriod ? "Período recomendado" : "Período informado"}</div>
+              <div style={styles.metaValue}>{safePeriod}</div>
             </div>
-            <div style={printStyles.metaItem}>
-              <div style={printStyles.metaTitle}>Datas</div>
-              <div style={printStyles.metaValue}>{safeDates}</div>
+            <div style={styles.metaCard}>
+              <div style={styles.metaLabel}>Datas</div>
+              <div style={styles.metaValue}>{safeDates}</div>
             </div>
           </div>
 
-          <div style={printStyles.metaGrid}>
-            <div style={printStyles.metaItem}>
-              <div style={printStyles.metaTitle}>Duração</div>
-              <div style={printStyles.metaValue}>{safeDuration}</div>
+          <div style={styles.metaGrid}>
+            <div style={styles.metaCard}>
+              <div style={styles.metaLabel}>Duração</div>
+              <div style={styles.metaValue}>{safeDuration}</div>
             </div>
-            <div style={printStyles.metaItem}>
-              <div style={printStyles.metaTitle}>Viajantes</div>
-              <div style={printStyles.metaValue}>{travelersLabel}</div>
+            <div style={styles.metaCard}>
+              <div style={styles.metaLabel}>Viajantes</div>
+              <div style={styles.metaValue}>{normalizePdfText(travelersLabel)}</div>
             </div>
-            <div style={printStyles.metaItem}>
-              <div style={printStyles.metaTitle}>Opção</div>
-              <div style={printStyles.metaValue}>{selectedVariantLabel}</div>
+            <div style={styles.metaCard}>
+              <div style={styles.metaLabel}>Opção escolhida</div>
+              <div style={styles.metaValue}>{normalizePdfText(selectedVariantLabel)}</div>
             </div>
           </div>
 
-          <div style={printStyles.metaGrid}>
-            <div style={printStyles.metaItem}>
-              <div style={printStyles.metaTitle}>Custo total</div>
-              <div style={printStyles.metaValue}>{estimatedCost}</div>
+          <div style={styles.metaGrid}>
+            <div style={styles.metaCard}>
+              <div style={styles.metaLabel}>Custo total</div>
+              <div style={styles.metaValue}>{normalizePdfText(estimatedCost)}</div>
             </div>
-            <div style={printStyles.metaItem}>
-              <div style={printStyles.metaTitle}>Por pessoa</div>
-              <div style={printStyles.metaValue}>{costPerPerson}</div>
+            <div style={styles.metaCard}>
+              <div style={styles.metaLabel}>Por pessoa</div>
+              <div style={styles.metaValue}>{normalizePdfText(costPerPerson)}</div>
             </div>
-            <div style={printStyles.metaItem}>
-              <div style={printStyles.metaTitle}>Moeda</div>
-              <div style={printStyles.metaValue}>{currency}</div>
+            <div style={styles.metaCard}>
+              <div style={styles.metaLabel}>Moeda</div>
+              <div style={styles.metaValue}>{currency}</div>
             </div>
           </div>
         </section>
 
-        <section data-pdf-section="costs" style={printStyles.card}>
-          <div style={printStyles.sectionTitleRow}>
-            <span style={printStyles.sectionDot}>1</span>
-            <h2 style={printStyles.sectionTitle}>Custos e premissas</h2>
-          </div>
-
-          <div style={{ display: "grid", gap: "10px" }}>
+        <PdfSection index={1} title="Custos e premissas" accent="#0f9fd7">
+          <div style={styles.costGrid}>
             {breakdown.map((item) => (
-              <div
-                key={item.label}
-                style={{ display: "flex", justifyContent: "space-between", gap: "12px", borderRadius: "12px", background: "#f7fafc", padding: "12px" }}
-              >
+              <div key={item.label} data-pdf-keep="true" style={styles.costRow}>
                 <div>
-                  <div style={printStyles.fullDayTitle}>{item.label}</div>
-                  <div style={printStyles.fullDayText}>{item.perPerson} por pessoa</div>
+                  <div style={{ ...styles.metaValue, textAlign: "left" }}>{normalizePdfText(item.label)}</div>
                 </div>
-                <div style={{ ...printStyles.metaValue, textAlign: "right" as const }}>{item.total}</div>
+                <div style={{ ...styles.bodyText, textAlign: "right" }}>{normalizePdfText(item.perPerson)} por pessoa</div>
+                <div style={styles.costValue}>{normalizePdfText(item.total)}</div>
               </div>
             ))}
           </div>
 
-          <div style={{ ...printStyles.metaItem, marginTop: "12px" }}>
-            <div style={printStyles.metaTitle}>Premissas usadas</div>
-            <div style={printStyles.paragraph}>{normalizePdfText(assumptions)}</div>
+          <div style={{ ...styles.metaCard, marginTop: "12px" }}>
+            <div style={styles.metaLabel}>Premissas utilizadas</div>
+            <p style={styles.bodyText}>{normalizedAssumptions}</p>
           </div>
-        </section>
+        </PdfSection>
 
-        <section data-pdf-section="summary" style={printStyles.card}>
-          <div style={printStyles.sectionTitleRow}>
-            <span style={printStyles.sectionDot}>2</span>
-            <h2 style={printStyles.sectionTitle}>Resumo da viagem</h2>
-          </div>
-          <p style={printStyles.paragraph}>{normalizePdfText(summary)}</p>
-          <p style={{ ...printStyles.paragraph, marginTop: "10px" }}>{normalizePdfText(safePeriodReason)}</p>
-        </section>
+        <PdfSection index={2} title="Resumo da viagem" accent="#004aad">
+          <p style={styles.bodyText}>{safeSummary}</p>
+          <p style={{ ...styles.bodyText, marginTop: "10px" }}>{safePeriodReason}</p>
+        </PdfSection>
 
-        <section data-pdf-section="short-itinerary" style={printStyles.card}>
-          <div style={printStyles.sectionTitleRow}>
-            <span style={printStyles.sectionDot}>3</span>
-            <h2 style={printStyles.sectionTitle}>Roteiro resumido</h2>
-          </div>
-          <div style={printStyles.itineraryGrid}>
+        <PdfSection index={3} title="Roteiro resumido" accent="#3fb950">
+          <div style={styles.compactList}>
             {itinerary.map((day, index) => (
-              <div key={day} style={printStyles.itineraryChip}>
-                <span style={printStyles.itemNumber}>{index + 1}</span>
-                <span style={printStyles.itineraryText}>{normalizePdfText(day)}</span>
+              <div key={`${index}-${day}`} data-pdf-keep="true" style={styles.compactItem}>
+                <span style={styles.itemIndex}>{index + 1}</span>
+                <span style={styles.compactText}>{normalizePdfText(day)}</span>
               </div>
             ))}
           </div>
-        </section>
+        </PdfSection>
 
-        <section data-pdf-section="full-itinerary" style={printStyles.card}>
-          <div style={printStyles.sectionTitleRow}>
-            <span style={printStyles.sectionDot}>4</span>
-            <h2 style={printStyles.sectionTitle}>Roteiro completo</h2>
-          </div>
+        <PdfSection index={4} title="Roteiro completo" accent="#7c3aed" keepTogether={false}>
           <div>
-            {detailedItinerary.map((day, index) => (
-              <div key={`${day.title}-${day.description}`} style={printStyles.fullDay}>
-                <span style={printStyles.fullDayIcon}>{index + 1}</span>
-                <div>
-                  <h3 style={printStyles.fullDayTitle}>{normalizePdfText(day.title)}</h3>
-                  <p style={printStyles.fullDayText}>{normalizePdfText(day.description)}</p>
+            {detailedItinerary.map((day, index) => {
+              const dayTitle = normalizePdfText(day.title || `Dia ${index + 1}`)
+              const daySegments = buildDaySegments(day.description)
+
+              return (
+                <article key={`${dayTitle}-${index}`} data-pdf-day="true" style={styles.dayCard}>
+                  <div style={styles.dayHeader}>
+                    <span style={styles.dayNumber}>{index + 1}</span>
+                    <h3 style={styles.dayTitle}>{dayTitle}</h3>
+                  </div>
+
+                  <div style={styles.segmentGrid}>
+                    {daySegments.map((segment) => (
+                      <div key={`${dayTitle}-${segment.label}`} style={styles.segmentCard}>
+                        <div style={styles.segmentLabel}>{segment.label}</div>
+                        <p style={styles.bodyText}>{normalizePdfText(segment.match)}</p>
+                      </div>
+                    ))}
+                  </div>
+
                   {day.tips.length > 0 ? (
-                    <ul style={{ ...printStyles.list, marginTop: "8px" }}>
+                    <ul style={styles.bulletList}>
                       {day.tips.map((tip) => (
-                        <li key={tip} style={{ ...printStyles.listItem, padding: "8px 10px", fontSize: "11px" }}>
-                          <span style={printStyles.itemNumber}>{"\u2022"}</span>
+                        <li key={`${dayTitle}-${tip}`} style={styles.bulletItem}>
+                          <span style={styles.bulletDot}>•</span>
                           <span>{normalizePdfText(tip)}</span>
                         </li>
                       ))}
                     </ul>
                   ) : null}
-                </div>
-              </div>
-            ))}
+                </article>
+              )
+            })}
           </div>
-        </section>
+        </PdfSection>
 
-        <section data-pdf-section="insights" style={printStyles.card}>
-          <div style={printStyles.sectionTitleRow}>
-            <span style={printStyles.sectionDot}>5</span>
-            <h2 style={printStyles.sectionTitle}>Insights da opção escolhida</h2>
-          </div>
-          <ul style={printStyles.list}>
+        <PdfSection index={5} title="Insights da opção escolhida" accent="#0f9fd7">
+          <ul style={styles.bulletList}>
             {insights.map((item) => (
-              <li key={item} style={printStyles.listItem}>
-                <span style={printStyles.itemNumber}>{"\u2022"}</span>
+              <li key={item} style={styles.bulletItem}>
+                <span style={styles.bulletDot}>•</span>
                 <span>{normalizePdfText(item)}</span>
               </li>
             ))}
           </ul>
-        </section>
+        </PdfSection>
 
-        <section data-pdf-section="why-this-trip" style={printStyles.card}>
-          <div style={printStyles.sectionTitleRow}>
-            <span style={printStyles.sectionDot}>6</span>
-            <h2 style={printStyles.sectionTitle}>Por que essa viagem faz sentido</h2>
-          </div>
-          <ul style={printStyles.list}>
+        <PdfSection index={6} title="Por que essa viagem faz sentido" accent="#004aad">
+          <ul style={styles.bulletList}>
             {whyThisTrip.map((item) => (
-              <li key={item} style={printStyles.listItem}>
-                <span style={printStyles.itemNumber}>{"\u2022"}</span>
+              <li key={item} style={styles.bulletItem}>
+                <span style={styles.bulletDot}>•</span>
                 <span>{normalizePdfText(item)}</span>
               </li>
             ))}
           </ul>
-        </section>
+        </PdfSection>
 
-        <section data-pdf-section="attention-points" style={printStyles.card}>
-          <div style={printStyles.sectionTitleRow}>
-            <span style={printStyles.sectionDot}>7</span>
-            <h2 style={printStyles.sectionTitle}>Pontos de atenção</h2>
-          </div>
-          <ul style={printStyles.list}>
+        <PdfSection index={7} title="Pontos de atenção" accent="#d97706">
+          <ul style={styles.bulletList}>
             {attentionPoints.map((item) => (
-              <li key={item} style={{ ...printStyles.listItem, background: "#fff7ed" }}>
-                <span style={printStyles.itemNumber}>{"\u2022"}</span>
+              <li key={item} style={styles.warningItem}>
+                <span style={styles.bulletDot}>!</span>
                 <span>{normalizePdfText(item)}</span>
               </li>
             ))}
           </ul>
-        </section>
+        </PdfSection>
 
-        <section data-pdf-section="final-notes" style={printStyles.card}>
-          <div style={printStyles.sectionTitleRow}>
-            <span style={printStyles.sectionDot}>8</span>
-            <h2 style={printStyles.sectionTitle}>Observações finais</h2>
-          </div>
-          <p style={printStyles.paragraph}>
-            Este roteiro foi criado especialmente para você com base nas suas preferências. Aproveite cada momento dessa experiência única.
+        <PdfSection index={8} title="Observações finais" accent="#475569">
+          <p style={styles.bodyText}>
+            Este roteiro foi criado com base nas suas preferências e no conteúdo já gerado no VUEI. Use este documento como guia
+            prático para consultar a viagem, revisar prioridades e organizar a execução com mais confiança.
           </p>
-          <p style={{ ...printStyles.paragraph, marginTop: "10px" }}>
-            Os valores são estimativas e podem variar conforme disponibilidade, câmbio, antecedência e período.
+          <p style={{ ...styles.bodyText, marginTop: "10px" }}>
+            Valores e disponibilidade podem variar conforme antecedência, câmbio, sazonalidade, lotação e regras de cada fornecedor.
           </p>
-        </section>
-      </div>
+        </PdfSection>
+      </main>
 
-      <footer style={printStyles.footer}>
+      <footer data-pdf-keep="true" style={styles.footer}>
         <div>
-          <strong>VUEI</strong> {"\u2014"} descubra, simule e planeje sua viagem em segundos
+          <strong>VUEI</strong> — descubra, simule e planeje sua viagem com mais clareza.
           <br />
           www.vuei.com.br
         </div>
-        <div>Documento gerado automaticamente</div>
+        <div>Documento gerado automaticamente a partir do roteiro salvo.</div>
       </footer>
     </div>
   )

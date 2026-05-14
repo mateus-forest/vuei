@@ -822,81 +822,91 @@ export function ResultView({
 
     if (!pdfTemplateRef.current) return
 
-    const html2pdf = (await import("html2pdf.js")).default
+    setActionError("")
 
-    await html2pdf()
-      .set({
-        margin: 0,
-        filename: `roteiro-vuei-${slugify(activeResult.destination) || "destino"}.pdf`,
-        image: { type: "jpeg", quality: 0.98 },
-        html2canvas: {
-          scale: 2,
-          useCORS: true,
-          backgroundColor: "#ffffff",
-          onclone: (clonedDocument: Document) => {
-            const safeColors: Array<[string, string]> = [
-              ["--background", "#ffffff"],
-              ["--foreground", "#17324d"],
-              ["--card", "#ffffff"],
-              ["--card-foreground", "#17324d"],
-              ["--popover", "#ffffff"],
-              ["--popover-foreground", "#17324d"],
-              ["--primary", "#004aad"],
-              ["--primary-foreground", "#ffffff"],
-              ["--secondary", "#f7fafc"],
-              ["--secondary-foreground", "#253b56"],
-              ["--muted", "#f8fafc"],
-              ["--muted-foreground", "#42566f"],
-              ["--accent", "#eaf8ff"],
-              ["--accent-foreground", "#15324f"],
-              ["--border", "#e3ebf4"],
-              ["--input", "#e3ebf4"],
-              ["--ring", "rgba(0,0,0,0)"],
-              ["--sidebar", "#ffffff"],
-              ["--sidebar-foreground", "#17324d"],
-              ["--sidebar-primary", "#004aad"],
-              ["--sidebar-primary-foreground", "#ffffff"],
-              ["--sidebar-accent", "#f7fafc"],
-              ["--sidebar-accent-foreground", "#17324d"],
-              ["--sidebar-border", "#e3ebf4"],
-              ["--sidebar-ring", "rgba(0,0,0,0)"],
-            ]
-            const targets = [
-              clonedDocument.documentElement,
-              clonedDocument.body,
-              clonedDocument.querySelector('[data-pdf-root="true"]'),
-            ].filter(Boolean) as HTMLElement[]
+    try {
+      const html2pdf = (await import("html2pdf.js")).default
 
-            targets.forEach((target) => {
-              safeColors.forEach(([property, value]) => {
-                target.style.setProperty(property, value)
+      await html2pdf()
+        .set({
+          margin: 0,
+          filename: `roteiro-vuei-${slugify(activeResult.destination) || "destino"}.pdf`,
+          image: { type: "jpeg", quality: 0.98 },
+          html2canvas: {
+            scale: 2,
+            useCORS: true,
+            backgroundColor: "#ffffff",
+            onclone: (clonedDocument: Document) => {
+              const safeColors: Array<[string, string]> = [
+                ["--background", "#ffffff"],
+                ["--foreground", "#17324d"],
+                ["--card", "#ffffff"],
+                ["--card-foreground", "#17324d"],
+                ["--popover", "#ffffff"],
+                ["--popover-foreground", "#17324d"],
+                ["--primary", "#004aad"],
+                ["--primary-foreground", "#ffffff"],
+                ["--secondary", "#f7fafc"],
+                ["--secondary-foreground", "#253b56"],
+                ["--muted", "#f8fafc"],
+                ["--muted-foreground", "#42566f"],
+                ["--accent", "#eaf8ff"],
+                ["--accent-foreground", "#15324f"],
+                ["--border", "#e3ebf4"],
+                ["--input", "#e3ebf4"],
+                ["--ring", "rgba(0,0,0,0)"],
+                ["--sidebar", "#ffffff"],
+                ["--sidebar-foreground", "#17324d"],
+                ["--sidebar-primary", "#004aad"],
+                ["--sidebar-primary-foreground", "#ffffff"],
+                ["--sidebar-accent", "#f7fafc"],
+                ["--sidebar-accent-foreground", "#17324d"],
+                ["--sidebar-border", "#e3ebf4"],
+                ["--sidebar-ring", "rgba(0,0,0,0)"],
+              ]
+              const targets = [
+                clonedDocument.documentElement,
+                clonedDocument.body,
+                clonedDocument.querySelector('[data-pdf-root="true"]'),
+              ].filter(Boolean) as HTMLElement[]
+
+              targets.forEach((target) => {
+                safeColors.forEach(([property, value]) => {
+                  target.style.setProperty(property, value)
+                })
+                target.style.setProperty("background-color", "#ffffff")
+                target.style.setProperty("color", "#17324d")
+                target.style.setProperty("border-color", "#e3ebf4")
+                target.style.setProperty("outline-color", "rgba(0,0,0,0)")
               })
-              target.style.setProperty("background-color", "#ffffff")
-              target.style.setProperty("color", "#17324d")
-              target.style.setProperty("border-color", "#e3ebf4")
-              target.style.setProperty("outline-color", "rgba(0,0,0,0)")
-            })
+            },
           },
-        },
-        jsPDF: {
-          unit: "pt",
-          format: "a4",
-          orientation: "portrait",
-        },
-        pagebreak: {
-          mode: ["css", "legacy"],
-          avoid: [
-            '[data-pdf-section="meta"]',
-            '[data-pdf-section="summary"]',
-            '[data-pdf-section="short-itinerary"]',
-            '[data-pdf-section="full-itinerary"]',
-            '[data-pdf-section="tips"]',
-            '[data-pdf-section="final-notes"]',
-          ],
-        },
-      })
-      .from(pdfTemplateRef.current)
-      .save()
+          jsPDF: {
+            unit: "pt",
+            format: "a4",
+            orientation: "portrait",
+          },
+          pagebreak: {
+            mode: ["css", "legacy"],
+            avoid: [
+              '[data-pdf-section="meta"]',
+              '[data-pdf-section="resumo-da-viagem"]',
+              '[data-pdf-section="roteiro-resumido"]',
+              '[data-pdf-section="insights-da-opção-escolhida"]',
+              '[data-pdf-section="por-que-essa-viagem-faz-sentido"]',
+              '[data-pdf-section="pontos-de-atenção"]',
+              '[data-pdf-section="observações-finais"]',
+              '[data-pdf-keep="true"]',
+              '[data-pdf-day="true"]',
+            ],
+          },
+        })
+        .from(pdfTemplateRef.current)
+        .save()
+    } catch (error) {
+      console.error("Failed to download trip PDF", error)
+      setActionError("Não foi possível iniciar o download. Se estiver no celular, tente abrir pelo navegador.")
+    }
   }
 
   return (
@@ -996,14 +1006,17 @@ export function ResultView({
                       <div className="text-sm text-muted-foreground">
                         {completeTripSummary.selectedVariantLabel} • {completeTripSummary.estimatedCost} • {completeTripSummary.costPerPerson} por pessoa
                       </div>
-                      <button
-                        type="button"
-                        onClick={() => void handleDownload()}
-                        className="inline-flex items-center justify-center gap-2 rounded-2xl border border-border/60 bg-white/80 px-4 py-3 text-sm font-medium text-foreground transition hover:border-[#5de0e6]/60"
-                      >
-                        <Download className="size-4 text-[#004aad]" />
-                        Baixar roteiro
-                      </button>
+                      <div className="flex flex-col items-start gap-2 sm:items-end">
+                        <button
+                          type="button"
+                          onClick={() => void handleDownload()}
+                          className="inline-flex items-center justify-center gap-2 rounded-2xl border border-border/60 bg-white/80 px-4 py-3 text-sm font-medium text-foreground transition hover:border-[#5de0e6]/60"
+                        >
+                          <Download className="size-4 text-[#004aad]" />
+                          Baixar roteiro
+                        </button>
+                        <p className="text-xs leading-5 text-muted-foreground">Se o download não iniciar, tente abrir pelo navegador.</p>
+                      </div>
                     </div>
 
                     {completeTripSummary.fullItinerary.map((day) => (
@@ -1163,9 +1176,12 @@ export function ResultView({
                     ? isGeneratingFullItinerary
                       ? "Gerando roteiro completo..."
                       : "Roteiro completo sob demanda"
-                    : "Baixar roteiro"}
+                  : "Baixar roteiro"}
                 <Download className="size-4 text-[#004aad]" />
               </button>
+              {hasFullItineraryGenerated ? (
+                <p className="text-xs leading-5 text-muted-foreground">Se o download não iniciar, tente abrir pelo navegador.</p>
+              ) : null}
 
               <button
                 type="button"
