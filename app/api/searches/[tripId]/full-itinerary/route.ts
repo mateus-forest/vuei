@@ -23,6 +23,7 @@ function buildRequestFromSearch(search: SearchRow, result: TripResult): TripGene
 
 export async function POST(_: Request, context: { params: Promise<{ tripId: string }> }) {
   const startedAt = Date.now()
+  const createdAt = new Date().toISOString()
   const session = await getServerSession()
 
   if (!session?.isAuthenticated || !session.userId) {
@@ -98,6 +99,7 @@ export async function POST(_: Request, context: { params: Promise<{ tripId: stri
       openaiError: "PROFILE_CREDIT_UPDATE_FAILED",
       durationMs: Date.now() - startedAt,
       model: null,
+      createdAt,
     })
 
     return NextResponse.json({ ok: false, error: "Seu saldo foi atualizado. Tente novamente." }, { status: 409 })
@@ -134,6 +136,7 @@ export async function POST(_: Request, context: { params: Promise<{ tripId: stri
       openaiError: "FULL_ITINERARY_CREDIT_TRANSACTION_FAILED",
       durationMs: Date.now() - startedAt,
       model: null,
+      createdAt,
     })
 
     return NextResponse.json({ ok: false, error: "Não foi possível registrar o consumo do crédito." }, { status: 500 })
@@ -183,6 +186,7 @@ export async function POST(_: Request, context: { params: Promise<{ tripId: stri
       openaiError: "FULL_ITINERARY_SAVE_FAILED",
       durationMs: Date.now() - startedAt,
       model: null,
+      createdAt,
     })
 
     return NextResponse.json({ ok: false, error: "Não foi possível salvar o roteiro completo." }, { status: 500 })
@@ -196,6 +200,7 @@ export async function POST(_: Request, context: { params: Promise<{ tripId: stri
     usedFallback: false,
     durationMs: Date.now() - startedAt,
     model: null,
+    createdAt,
   })
 
   return NextResponse.json({

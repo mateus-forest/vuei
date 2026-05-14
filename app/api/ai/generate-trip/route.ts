@@ -44,6 +44,7 @@ function jsonError(error: string, code: string, status: number, detail?: string)
 export async function POST(request: Request) {
   console.time("generate-trip-total")
   const startedAt = Date.now()
+  const createdAt = new Date().toISOString()
   let json: unknown
 
   try {
@@ -122,6 +123,7 @@ export async function POST(request: Request) {
           usedFallback: didTripUseFallback(result),
           durationMs: Date.now() - startedAt,
           model: OPENAI_TRIP_MODEL,
+          createdAt,
         })
 
         return jsonOk({
@@ -152,6 +154,7 @@ export async function POST(request: Request) {
           openaiError: detail,
           durationMs: Date.now() - startedAt,
           model: OPENAI_TRIP_MODEL,
+          createdAt,
         })
 
         return jsonError(message, "AI_UNAVAILABLE", status, detail)
@@ -180,6 +183,7 @@ export async function POST(request: Request) {
         openaiError: response.error,
         durationMs: Date.now() - startedAt,
         model: OPENAI_TRIP_MODEL,
+        createdAt,
       })
 
       return jsonError(response.message, response.error, response.status, response.error)
@@ -193,6 +197,7 @@ export async function POST(request: Request) {
       usedFallback: didTripUseFallback(response.result),
       durationMs: Date.now() - startedAt,
       model: OPENAI_TRIP_MODEL,
+      createdAt,
     })
 
     return jsonOk({

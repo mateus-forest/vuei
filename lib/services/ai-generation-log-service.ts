@@ -12,6 +12,7 @@ export type AIGenerationLogInput = {
   openaiError?: string | null
   durationMs: number
   model?: string | null
+  createdAt?: string
 }
 
 export type AIGenerationMetrics = {
@@ -64,10 +65,11 @@ export async function recordAIGenerationLog({
   openaiError,
   durationMs,
   model,
+  createdAt,
 }: AIGenerationLogInput) {
   try {
     const supabase = createSupabaseAdminClient()
-    const { error } = await supabase.from("ai_generation_logs").insert({
+    const payload = {
       user_id: userId ?? null,
       source,
       generation_type: generationType,
@@ -76,10 +78,32 @@ export async function recordAIGenerationLog({
       openai_error: sanitizeOpenAIError(openaiError),
       duration_ms: normalizeDuration(durationMs),
       model: model ?? null,
-    })
+      created_at: createdAt ?? new Date().toISOString(),
+    }
+    const { error } = await supabase.from("ai_generation_logs").insert(payload)
+
+    if (error) {
+      console.error("AI_GENERATION_LOG_INSERT_ERROR", {
+        message: error.message,
+        code: error.code,
+        details: error.details,
+        hint: error.hint,
+        source,
+        generationType,
+        success,
+        usedFallback,
+      })
+    }
 
     return { error: error ?? null }
   } catch (error) {
+    console.error("AI_GENERATION_LOG_INSERT_ERROR", {
+      message: error instanceof Error ? error.message : String(error),
+      source,
+      generationType,
+      success,
+      usedFallback,
+    })
     return { error }
   }
 }
@@ -99,6 +123,15 @@ export async function getAIGenerationMetrics(): Promise<AIGenerationMetrics> {
     ])
 
     if (aggregateResult.error || !aggregateResult.data) {
+      if (aggregateResult.error) {
+        console.error("AI_GENERATION_METRICS_QUERY_ERROR", {
+          message: aggregateResult.error.message,
+          code: aggregateResult.error.code,
+          details: aggregateResult.error.details,
+          hint: aggregateResult.error.hint,
+        })
+      }
+
       return {
         totalGenerations: countResult.count ?? 0,
         fallbackRate: 0,
@@ -129,7 +162,11 @@ export async function getAIGenerationMetrics(): Promise<AIGenerationMetrics> {
         createdAt: item.created_at,
       })),
     }
-  } catch {
+  } catch (error) {
+    console.error("AI_GENERATION_METRICS_QUERY_ERROR", {
+      message: error instanceof Error ? error.message : String(error),
+    })
+
     return {
       totalGenerations: 0,
       fallbackRate: 0,
