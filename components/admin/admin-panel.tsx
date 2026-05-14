@@ -3,6 +3,7 @@
 import { useState, useTransition } from "react"
 import { useRouter } from "next/navigation"
 import { CreditCard, Search, ShieldCheck, Users, Wallet } from "lucide-react"
+import { AdminAIMetricsCard } from "@/components/admin/admin-ai-metrics-card"
 import { AdminSupportCard } from "@/components/admin/admin-support-card"
 import { creditPackages } from "@/lib/constants/credit-packages"
 import type { CreditTransactionRow } from "@/types/database"
@@ -315,6 +316,7 @@ export function AdminPanel({
         </BrandCard>
 
         <AdminSupportCard support={support} />
+        <AdminAIMetricsCard />
       </div>
 
       <Dialog open={!!selectedUser} onOpenChange={(open) => (open ? null : setSelectedUser(null))}>

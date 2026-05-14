@@ -100,3 +100,16 @@ export type SupportTicketRow = {
   updated_at: string
   resolved_at: string | null
 }
+
+export type AIGenerationLogRow = {
+  id: string
+  user_id: string | null
+  source: "anonymous_landing" | "authenticated"
+  generation_type: "preview" | "full_itinerary" | "adjustment" | "comparison"
+  success: boolean
+  used_fallback: boolean
+  openai_error: string | null
+  duration_ms: number
+  model: string | null
+  created_at: string
+}

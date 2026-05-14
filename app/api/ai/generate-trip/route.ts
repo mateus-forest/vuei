@@ -1,7 +1,8 @@
 import { NextResponse } from "next/server"
 import { z } from "zod"
+import { recordAIGenerationLog } from "@/lib/services/ai-generation-log-service"
 import { getServerSession } from "@/lib/services/server-session-service"
-import { generateAndPersistTrip, generateTripWithAI } from "@/lib/services/trip-service"
+import { didTripUseFallback, generateAndPersistTrip, generateTripWithAI, OPENAI_TRIP_MODEL } from "@/lib/services/trip-service"
 import { createSupabaseAdminClient } from "@/lib/supabase/server"
 import { sanitizeTripProfileInput } from "@/lib/travel/trip-profile"
 
@@ -42,6 +43,7 @@ function jsonError(error: string, code: string, status: number, detail?: string)
 
 export async function POST(request: Request) {
   console.time("generate-trip-total")
+  const startedAt = Date.now()
   let json: unknown
 
   try {
@@ -61,6 +63,7 @@ export async function POST(request: Request) {
   const origin = body.origin ?? "busca"
   const profile = sanitizeTripProfileInput(body.profile)
   const session = await getServerSession()
+  const source = session?.isAuthenticated ? "authenticated" : "anonymous_landing"
 
   console.debug("Trip generation request received", {
     authenticated: !!session?.isAuthenticated,
@@ -111,6 +114,16 @@ export async function POST(request: Request) {
           console.error("PUBLIC SEARCH INSERT ERROR:", error)
         }
 
+        await recordAIGenerationLog({
+          userId: null,
+          source,
+          generationType: "preview",
+          success: true,
+          usedFallback: didTripUseFallback(result),
+          durationMs: Date.now() - startedAt,
+          model: OPENAI_TRIP_MODEL,
+        })
+
         return jsonOk({
           persisted: !!publicSearchId,
           tripId: publicSearchId,
@@ -130,6 +143,17 @@ export async function POST(request: Request) {
             ? error.message
             : "OpenAI trip generation failed"
 
+        await recordAIGenerationLog({
+          userId: null,
+          source,
+          generationType: "preview",
+          success: false,
+          usedFallback: false,
+          openaiError: detail,
+          durationMs: Date.now() - startedAt,
+          model: OPENAI_TRIP_MODEL,
+        })
+
         return jsonError(message, "AI_UNAVAILABLE", status, detail)
       }
     }
@@ -147,8 +171,29 @@ export async function POST(request: Request) {
     })
 
     if (!response.ok) {
+      await recordAIGenerationLog({
+        userId: session.userId ?? null,
+        source,
+        generationType: "preview",
+        success: false,
+        usedFallback: false,
+        openaiError: response.error,
+        durationMs: Date.now() - startedAt,
+        model: OPENAI_TRIP_MODEL,
+      })
+
       return jsonError(response.message, response.error, response.status, response.error)
     }
+
+    await recordAIGenerationLog({
+      userId: session.userId ?? null,
+      source,
+      generationType: "preview",
+      success: true,
+      usedFallback: didTripUseFallback(response.result),
+      durationMs: Date.now() - startedAt,
+      model: OPENAI_TRIP_MODEL,
+    })
 
     return jsonOk({
       persisted: !!response.tripId,

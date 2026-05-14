@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server"
+import { recordAIGenerationLog } from "@/lib/services/ai-generation-log-service"
 import { CREDITS_PER_GENERATED_TRIP } from "@/lib/services/credit-service"
 import { recordCreditTransaction } from "@/lib/services/credit-transaction-service"
 import { getServerSession } from "@/lib/services/server-session-service"
@@ -21,6 +22,7 @@ function buildRequestFromSearch(search: SearchRow, result: TripResult): TripGene
 }
 
 export async function POST(_: Request, context: { params: Promise<{ tripId: string }> }) {
+  const startedAt = Date.now()
   const session = await getServerSession()
 
   if (!session?.isAuthenticated || !session.userId) {
@@ -87,6 +89,17 @@ export async function POST(_: Request, context: { params: Promise<{ tripId: stri
     .maybeSingle()
 
   if (profileUpdateError || !updatedProfile) {
+    await recordAIGenerationLog({
+      userId: session.userId,
+      source: "authenticated",
+      generationType: "full_itinerary",
+      success: false,
+      usedFallback: false,
+      openaiError: "PROFILE_CREDIT_UPDATE_FAILED",
+      durationMs: Date.now() - startedAt,
+      model: null,
+    })
+
     return NextResponse.json({ ok: false, error: "Seu saldo foi atualizado. Tente novamente." }, { status: 409 })
   }
 
@@ -111,6 +124,17 @@ export async function POST(_: Request, context: { params: Promise<{ tripId: stri
       })
       .eq("id", session.userId)
       .eq("credits", newCreditsBalance)
+
+    await recordAIGenerationLog({
+      userId: session.userId,
+      source: "authenticated",
+      generationType: "full_itinerary",
+      success: false,
+      usedFallback: false,
+      openaiError: "FULL_ITINERARY_CREDIT_TRANSACTION_FAILED",
+      durationMs: Date.now() - startedAt,
+      model: null,
+    })
 
     return NextResponse.json({ ok: false, error: "Não foi possível registrar o consumo do crédito." }, { status: 500 })
   }
@@ -150,8 +174,29 @@ export async function POST(_: Request, context: { params: Promise<{ tripId: stri
       .eq("type", "full_itinerary")
       .eq("created_at", now)
 
+    await recordAIGenerationLog({
+      userId: session.userId,
+      source: "authenticated",
+      generationType: "full_itinerary",
+      success: false,
+      usedFallback: false,
+      openaiError: "FULL_ITINERARY_SAVE_FAILED",
+      durationMs: Date.now() - startedAt,
+      model: null,
+    })
+
     return NextResponse.json({ ok: false, error: "Não foi possível salvar o roteiro completo." }, { status: 500 })
   }
+
+  await recordAIGenerationLog({
+    userId: session.userId,
+    source: "authenticated",
+    generationType: "full_itinerary",
+    success: true,
+    usedFallback: false,
+    durationMs: Date.now() - startedAt,
+    model: null,
+  })
 
   return NextResponse.json({
     ok: true,

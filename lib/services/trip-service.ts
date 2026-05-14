@@ -1,4 +1,4 @@
-import { randomUUID } from "crypto"
+﻿import { randomUUID } from "crypto"
 import { z } from "zod"
 import { zodTextFormat } from "openai/helpers/zod"
 import { defaultTripResult, quizResultMap, tripCatalog } from "@/lib/mocks/trips"
@@ -70,7 +70,7 @@ const MAX_TRIP_COST = 50000
 const MONTH_LABELS = [
   "janeiro",
   "fevereiro",
-  "março",
+  "marÃ§o",
   "abril",
   "maio",
   "junho",
@@ -102,7 +102,8 @@ type SeasonalVariantPricing = {
 }
 
 type AIParseErrorCode = "AI_JSON_INVALID" | "AI_JSON_NOT_FOUND" | "AI_SCHEMA_INVALID"
-const AI_FALLBACK_CONTEXT = "Estimativa inicial gerada com base nas informações disponíveis."
+export const OPENAI_TRIP_MODEL = "gpt-4.1-mini"
+const AI_FALLBACK_CONTEXT = "Estimativa inicial gerada com base nas informaÃ§Ãµes disponÃ­veis."
 
 function createAIParseError(code: AIParseErrorCode, message: string, detail?: string) {
   const error = new Error(message)
@@ -152,7 +153,7 @@ function parseAITripPayload(rawResponse: string) {
     } catch (extractedError) {
       throw createAIParseError(
         "AI_JSON_INVALID",
-        "IA retornou JSON inválido",
+        "IA retornou JSON invÃ¡lido",
         extractedError instanceof Error ? extractedError.message : String(extractedError),
       )
     }
@@ -165,7 +166,7 @@ function parseAITripPayload(rawResponse: string) {
   const validated = aiTripSchema.safeParse(parsed)
 
   if (!validated.success) {
-    throw createAIParseError("AI_SCHEMA_INVALID", "IA retornou JSON inválido para o schema esperado", validated.error.message)
+    throw createAIParseError("AI_SCHEMA_INVALID", "IA retornou JSON invÃ¡lido para o schema esperado", validated.error.message)
   }
 
   return validated.data
@@ -173,6 +174,10 @@ function parseAITripPayload(rawResponse: string) {
 
 function normalizeText(value: string | null | undefined) {
   return (value ?? "").replace(/\s+/g, " ").trim()
+}
+
+export function didTripUseFallback(result: Pick<TripResult, "context"> | null | undefined) {
+  return normalizeText(result?.context) === AI_FALLBACK_CONTEXT
 }
 
 function formatTripCost(value: number) {
@@ -225,12 +230,12 @@ function extractDestinationFromInput(inputText?: string) {
   const normalizedInput = normalizeText(inputText)
   const lower = normalizedInput.toLowerCase()
 
-  const paraMatch = lower.match(/(?:para|em)\s+([a-zà-ÿ\s-]{3,})/i)
+  const paraMatch = lower.match(/(?:para|em)\s+([a-zÃ -Ã¿\s-]{3,})/i)
   if (paraMatch?.[1]) {
     return paraMatch[1]
       .trim()
       .replace(/\b\w/g, (letter) => letter.toUpperCase())
-      .replace(/\s+(com|minha|minhas|meu|meus|gastando|ate|até|por|durante)\b.*$/i, "")
+      .replace(/\s+(com|minha|minhas|meu|meus|gastando|ate|atÃ©|por|durante)\b.*$/i, "")
   }
 
   return undefined
@@ -268,7 +273,7 @@ function inferTravelers(request: TripGenerationInput, bestFor = "") {
   }
 
   if (normalized.includes("casal") || normalized.includes("dupla")) return 2
-  if (normalized.includes("família") || normalized.includes("familia")) return 3
+  if (normalized.includes("famÃ­lia") || normalized.includes("familia")) return 3
   if (normalized.includes("sozinho") || normalized.includes("solo")) return 1
 
   return 2
@@ -307,17 +312,17 @@ function resolvePeriodData(request: TripGenerationInput): PeriodData {
 
   if (request.quizAnswers) {
     return {
-      periodLabel: "Período não informado",
+      periodLabel: "PerÃ­odo nÃ£o informado",
       durationDays,
       durationLabel,
       isSuggestedPeriod: false,
-      periodReason: "Período ainda não definido para a viagem.",
+      periodReason: "PerÃ­odo ainda nÃ£o definido para a viagem.",
     }
   }
 
   const normalizedInput = request.inputText?.toLowerCase() ?? ""
   const dateRangeMatch = normalizedInput.match(
-    /(\d{1,2})\s*(?:a|-|até)\s*(\d{1,2})\s+de\s+(janeiro|fevereiro|março|abril|maio|junho|julho|agosto|setembro|outubro|novembro|dezembro)/i,
+    /(\d{1,2})\s*(?:a|-|atÃ©)\s*(\d{1,2})\s+de\s+(janeiro|fevereiro|marÃ§o|abril|maio|junho|julho|agosto|setembro|outubro|novembro|dezembro)/i,
   )
 
   if (dateRangeMatch) {
@@ -331,12 +336,12 @@ function resolvePeriodData(request: TripGenerationInput): PeriodData {
       durationDays,
       durationLabel,
       isSuggestedPeriod: false,
-      periodReason: "Período ainda não definido para a viagem.",
+      periodReason: "PerÃ­odo ainda nÃ£o definido para a viagem.",
     }
   }
 
   const dayMonthMatch = normalizedInput.match(
-    /(\d{1,2})\s+de\s+(janeiro|fevereiro|março|abril|maio|junho|julho|agosto|setembro|outubro|novembro|dezembro)/i,
+    /(\d{1,2})\s+de\s+(janeiro|fevereiro|marÃ§o|abril|maio|junho|julho|agosto|setembro|outubro|novembro|dezembro)/i,
   )
 
   if (dayMonthMatch) {
@@ -348,7 +353,7 @@ function resolvePeriodData(request: TripGenerationInput): PeriodData {
       durationDays,
       durationLabel,
       isSuggestedPeriod: false,
-      periodReason: "Período ainda não definido para a viagem.",
+      periodReason: "PerÃ­odo ainda nÃ£o definido para a viagem.",
     }
   }
 
@@ -359,16 +364,16 @@ function resolvePeriodData(request: TripGenerationInput): PeriodData {
       durationDays,
       durationLabel,
       isSuggestedPeriod: false,
-      periodReason: "Mês informado pelo usuário e preservado como base da viagem.",
+      periodReason: "MÃªs informado pelo usuÃ¡rio e preservado como base da viagem.",
     }
   }
 
   return {
-    periodLabel: "Período não informado",
+    periodLabel: "PerÃ­odo nÃ£o informado",
     durationDays,
     durationLabel,
       isSuggestedPeriod: false,
-      periodReason: "Período ainda não definido para a viagem.",
+      periodReason: "PerÃ­odo ainda nÃ£o definido para a viagem.",
   }
 }
 
@@ -377,11 +382,11 @@ function resolveTripPeriodData(request: TripGenerationInput, destination?: strin
 
   if (!destination) {
     return {
-      periodLabel: "Período não informado",
+      periodLabel: "PerÃ­odo nÃ£o informado",
       durationDays,
       durationLabel: `${durationDays} ${durationDays === 1 ? "dia" : "dias"}`,
       isSuggestedPeriod: false,
-      periodReason: "Período ainda não definido para a viagem.",
+      periodReason: "PerÃ­odo ainda nÃ£o definido para a viagem.",
     }
   }
 
@@ -481,9 +486,9 @@ function isInternationalDestination(request: TripGenerationInput, destination: s
   const internationalHints = [
     "portugal",
     "espanha",
-    "itália",
+    "itÃ¡lia",
     "italia",
-    "frança",
+    "franÃ§a",
     "franca",
     "paris",
     "barcelona",
@@ -516,7 +521,7 @@ function requestedBrazilScope(request: TripGenerationInput) {
   }
 
   const text = (request.inputText ?? "").toLowerCase()
-  return ["brasil", "nacional", "nacionais", "doméstico", "domestico", "dentro do brasil"].some((hint) => text.includes(hint))
+  return ["brasil", "nacional", "nacionais", "domÃ©stico", "domestico", "dentro do brasil"].some((hint) => text.includes(hint))
 }
 
 function selectDomesticFallbackDestination(request: TripGenerationInput) {
@@ -524,12 +529,12 @@ function selectDomesticFallbackDestination(request: TripGenerationInput) {
   const style = request.quizAnswers?.tripStyle ?? request.profile?.style
   const budgetCap = resolveBudgetCapBRL(request) ?? 8000
 
-  if (vibe === "inverno") return budgetCap <= 5000 ? "Campos do Jordão" : "Gramado"
-  if (vibe === "natureza") return style === "familia" ? "Foz do Iguaçu" : "Bonito"
+  if (vibe === "inverno") return budgetCap <= 5000 ? "Campos do JordÃ£o" : "Gramado"
+  if (vibe === "natureza") return style === "familia" ? "Foz do IguaÃ§u" : "Bonito"
   if (vibe === "cultura") return "Recife"
   if (style === "familia" && budgetCap <= 8000) return "Porto Seguro"
-  if (vibe === "praia" || vibe === "verao") return budgetCap <= 5000 ? "João Pessoa" : "Maceió"
-  return "Florianópolis"
+  if (vibe === "praia" || vibe === "verao") return budgetCap <= 5000 ? "JoÃ£o Pessoa" : "MaceiÃ³"
+  return "FlorianÃ³polis"
 }
 
 function normalizeDestinationToScope(destination: string, request: TripGenerationInput) {
@@ -883,9 +888,9 @@ function normalizeItinerary(values: string[], destination: string, variantTitle:
   }
 
   return [
-    `Dia 1: chegada em ${destination} com organização da hospedagem e primeiros deslocamentos no ritmo ${variantTitle.toLowerCase()}.`,
-    `Dia 2: aproveite o principal passeio de ${destination}, com pausas adequadas e custos compatíveis com a proposta ${variantTitle.toLowerCase()}.`,
-    `Dia 3: finalize a viagem com experiências complementares, gastronomia e retorno planejado.`,
+    `Dia 1: chegada em ${destination} com organizaÃ§Ã£o da hospedagem e primeiros deslocamentos no ritmo ${variantTitle.toLowerCase()}.`,
+    `Dia 2: aproveite o principal passeio de ${destination}, com pausas adequadas e custos compatÃ­veis com a proposta ${variantTitle.toLowerCase()}.`,
+    `Dia 3: finalize a viagem com experiÃªncias complementares, gastronomia e retorno planejado.`,
   ]
 }
 
@@ -901,17 +906,17 @@ function normalizePreviewItinerary(values: string[], destination: string, varian
 
   return Array.from({ length: totalDays }, (_, index) => {
     if (index === 0) {
-      return `Dia 1: chegada em ${destination}, organização da hospedagem e primeira experiência leve.`
+      return `Dia 1: chegada em ${destination}, organizaÃ§Ã£o da hospedagem e primeira experiÃªncia leve.`
     }
 
     if (index === totalDays - 1) {
-      return `Dia ${index + 1}: encerramento da viagem, últimas experiências e retorno planejado.`
+      return `Dia ${index + 1}: encerramento da viagem, Ãºltimas experiÃªncias e retorno planejado.`
     }
 
     const dayThemes = [
-      `Dia ${index + 1}: passeio principal com ritmo ${variantTitle.toLowerCase()} e deslocamentos bem distribuídos.`,
-      `Dia ${index + 1}: experiência cultural, gastronômica ou de natureza alinhada ao perfil da viagem.`,
-      `Dia ${index + 1}: agenda complementar com tempo livre e passeio secundário para variar o roteiro.`,
+      `Dia ${index + 1}: passeio principal com ritmo ${variantTitle.toLowerCase()} e deslocamentos bem distribuÃ­dos.`,
+      `Dia ${index + 1}: experiÃªncia cultural, gastronÃ´mica ou de natureza alinhada ao perfil da viagem.`,
+      `Dia ${index + 1}: agenda complementar com tempo livre e passeio secundÃ¡rio para variar o roteiro.`,
     ]
 
     return dayThemes[(index - 1) % dayThemes.length]
@@ -932,11 +937,11 @@ function buildAssumptions({
   request: TripGenerationInput
 }) {
   const international = isInternationalDestination(request, destination)
-  const scope = international ? "trechos aéreos internacionais e hospedagem de padrão turístico" : "trechos nacionais e hospedagem de padrão turístico"
+  const scope = international ? "trechos aÃ©reos internacionais e hospedagem de padrÃ£o turÃ­stico" : "trechos nacionais e hospedagem de padrÃ£o turÃ­stico"
 
   return `Estimativa em BRL para ${travelers} ${travelers === 1 ? "pessoa" : "pessoas"} durante ${durationDays} ${
     durationDays === 1 ? "dia" : "dias"
-  }, considerando ${scope}, alimentação diária, transporte local e passeios compatíveis com a opção ${variantTitle.toLowerCase()}.`
+  }, considerando ${scope}, alimentaÃ§Ã£o diÃ¡ria, transporte local e passeios compatÃ­veis com a opÃ§Ã£o ${variantTitle.toLowerCase()}.`
 }
 
 function normalizeVariant({
@@ -1172,7 +1177,7 @@ function normalizeEstimatedCost(rawCost: string, request: TripGenerationInput, b
 function buildFallbackTripResult(origin: TripOrigin): TripResult {
   return {
     ...defaultTripResult,
-    periodLabel: "Período não informado",
+    periodLabel: "PerÃ­odo nÃ£o informado",
     durationDays: 5,
     durationLabel: "5 dias",
     travelers: 2,
@@ -1201,13 +1206,13 @@ function normalizeTripResult(result: TripResult, request?: TripGenerationInput):
     destination: normalizedDestination,
     bestFor,
     estimatedCost: normalizedCost,
-    periodLabel: result.periodLabel ?? periodData?.periodLabel ?? "Período não informado",
+    periodLabel: result.periodLabel ?? periodData?.periodLabel ?? "PerÃ­odo nÃ£o informado",
     startDate: result.startDate ?? periodData?.startDate,
     endDate: result.endDate ?? periodData?.endDate,
     durationDays: result.durationDays ?? periodData?.durationDays,
     durationLabel: result.durationLabel ?? periodData?.durationLabel,
     isSuggestedPeriod: result.isSuggestedPeriod ?? periodData?.isSuggestedPeriod ?? false,
-    periodReason: result.periodReason ?? periodData?.periodReason ?? "Período ainda não definido para a viagem.",
+    periodReason: result.periodReason ?? periodData?.periodReason ?? "PerÃ­odo ainda nÃ£o definido para a viagem.",
     travelers,
     currency: "BRL",
     detailedItinerary: result.detailedItinerary,
@@ -1246,8 +1251,8 @@ function buildUserPrompt(request: TripGenerationInput) {
         "Perfil complementar informado:",
         `- estilo complementar: ${request.profile.style ?? "nao informado"}`,
         `- ritmo: ${request.profile.pace ?? "nao informado"}`,
-        `- preferências: ${request.profile.preferences?.join(", ") || "nao informadas"}`,
-        `- sensibilidade a preço: ${request.profile.priceSensitivity ?? "nao informada"}`,
+        `- preferÃªncias: ${request.profile.preferences?.join(", ") || "nao informadas"}`,
+        `- sensibilidade a preÃ§o: ${request.profile.priceSensitivity ?? "nao informada"}`,
         `- voo: ${request.profile.flightPreference ?? "nao informado"}`,
       ]
     : []
@@ -1257,26 +1262,26 @@ function buildUserPrompt(request: TripGenerationInput) {
       `Origem: ${request.origin}`,
       "Respostas do quiz:",
       `- estilo: ${request.quizAnswers.tripStyle}`,
-      `- orçamento: ${request.quizAnswers.budget}`,
-      `- duração: ${request.quizAnswers.duration}`,
-      `- região: ${request.quizAnswers.region}`,
+      `- orÃ§amento: ${request.quizAnswers.budget}`,
+      `- duraÃ§Ã£o: ${request.quizAnswers.duration}`,
+      `- regiÃ£o: ${request.quizAnswers.region}`,
       `- vibe: ${request.quizAnswers.vibe}`,
       `- viajantes estimados: ${travelers}`,
       `- status do periodo: ${periodData.isSuggestedPeriod ? "periodo recomendado pelo backend" : "periodo informado pelo usuario"}`,
       `- motivo do periodo: ${periodData.periodReason}`,
-      `- período informado: ${periodData.periodLabel}`,
-      `- duração esperada: ${periodData.durationDays} dias`,
+      `- perÃ­odo informado: ${periodData.periodLabel}`,
+      `- duraÃ§Ã£o esperada: ${periodData.durationDays} dias`,
     ].join("\n")
   }
 
   return [
     `Origem: ${request.origin}`,
-    `Solicitação do usuário: ${request.inputText?.trim() || "Busca VUEI"}`,
+    `SolicitaÃ§Ã£o do usuÃ¡rio: ${request.inputText?.trim() || "Busca VUEI"}`,
     `Viajantes estimados: ${travelers}`,
     `Status do periodo: ${periodData.isSuggestedPeriod ? "periodo recomendado pelo backend" : "periodo informado pelo usuario"}`,
     `Motivo do periodo: ${periodData.periodReason}`,
-    `Período informado: ${periodData.periodLabel}`,
-    `Duração esperada: ${periodData.durationDays} dias`,
+    `PerÃ­odo informado: ${periodData.periodLabel}`,
+    `DuraÃ§Ã£o esperada: ${periodData.durationDays} dias`,
   ].join("\n")
 }
 
@@ -1359,7 +1364,7 @@ function buildCompactTripResult({
   const selectedVariantType = resolveSelectedVariantType(normalizedVariants, request, bestFor)
   const selectedVariant = normalizedVariants.find((variant) => variant.type === selectedVariantType) ?? normalizedVariants[1] ?? normalizedVariants[0]
   const intelligenceSummary = buildTripIntelligence(destination, request).intelligence.explanation.summary
-  const safeContext = normalizeText(context) || "Estimativa inicial gerada com base nas informações disponíveis."
+  const safeContext = normalizeText(context) || "Estimativa inicial gerada com base nas informaÃ§Ãµes disponÃ­veis."
 
   return normalizeTripResult(
     {
@@ -1368,7 +1373,7 @@ function buildCompactTripResult({
       bestFor: normalizeText(bestFor) || "viajantes que buscam uma viagem bem planejada",
       summary:
         normalizeText(summary) ||
-        `Sugestão inicial para ${destination}, com período recomendado, custos em BRL e comparação clara entre as opções da viagem.`,
+        `SugestÃ£o inicial para ${destination}, com perÃ­odo recomendado, custos em BRL e comparaÃ§Ã£o clara entre as opÃ§Ãµes da viagem.`,
       periodLabel: !aiReturnedUnknownPeriod && normalizedPeriodLabel ? normalizedPeriodLabel : periodData.periodLabel,
       startDate: periodData.startDate ? normalizeText(startDate ?? undefined) || periodData.startDate : periodData.startDate,
       endDate: periodData.endDate ? normalizeText(endDate ?? undefined) || periodData.endDate : periodData.endDate,
@@ -1428,31 +1433,31 @@ function resolveAIError(error: unknown) {
   if (status === 429 || message.toLowerCase().includes("quota")) {
     return {
       status: 429,
-      message: "Não foi possível gerar sua viagem agora. Tente novamente em alguns instantes.",
+      message: "NÃ£o foi possÃ­vel gerar sua viagem agora. Tente novamente em alguns instantes.",
     }
   }
 
   if (
-    message.includes("IA retornou JSON inválido") ||
+    message.includes("IA retornou JSON invÃ¡lido") ||
     message.includes("Nenhum JSON encontrado na resposta da IA") ||
     message.includes("schema esperado")
   ) {
     return {
       status: 502,
-      message: "A IA respondeu em um formato inválido. Tente novamente em instantes.",
+      message: "A IA respondeu em um formato invÃ¡lido. Tente novamente em instantes.",
     }
   }
 
   if (message.includes("OPENAI_API_KEY")) {
     return {
       status: 503,
-      message: "Não foi possível gerar sua viagem agora. Tente novamente em instantes.",
+      message: "NÃ£o foi possÃ­vel gerar sua viagem agora. Tente novamente em instantes.",
     }
   }
 
   return {
     status: 503,
-    message: "Não foi possível gerar sua viagem agora. Tente novamente em instantes.",
+    message: "NÃ£o foi possÃ­vel gerar sua viagem agora. Tente novamente em instantes.",
   }
 }
 
@@ -1542,7 +1547,7 @@ export function enrichTripResultWithFullItinerary(result: TripResult, request?: 
   const selectedVariant = variants.find((variant) => variant.type === selectedVariantType) ?? variants[1] ?? variants[0]
   const selectedDetailedItinerary = selectedVariant?.detailedItinerary ?? []
   const selectedFullItinerary = selectedDetailedItinerary.map(
-    (day) => `Manhã: ${day.morning} Tarde: ${day.afternoon} Noite: ${day.evening}`,
+    (day) => `ManhÃ£: ${day.morning} Tarde: ${day.afternoon} Noite: ${day.evening}`,
   )
 
   return normalizeTripResult(
@@ -1553,7 +1558,7 @@ export function enrichTripResultWithFullItinerary(result: TripResult, request?: 
       durationDays,
       durationLabel: `${durationDays} ${durationDays === 1 ? "dia" : "dias"}`,
       variants,
-      itinerary: selectedVariant?.itinerary ?? normalizePreviewItinerary(result.itinerary ?? [], destination, "Intermediário", durationDays),
+      itinerary: selectedVariant?.itinerary ?? normalizePreviewItinerary(result.itinerary ?? [], destination, "IntermediÃ¡rio", durationDays),
       detailedItinerary: selectedDetailedItinerary,
       fullItinerary: selectedFullItinerary,
       selectedVariantType,
@@ -1583,7 +1588,7 @@ export async function generateTripWithAI(request: TripGenerationInput) {
   try {
     const client = getOpenAIServerClient()
     const response = await client.responses.create({
-      model: "gpt-4.1-mini",
+      model: OPENAI_TRIP_MODEL,
       max_output_tokens: 650,
       input: [
         {
@@ -1592,18 +1597,18 @@ export async function generateTripWithAI(request: TripGenerationInput) {
             {
               type: "input_text",
               text: [
-                "Responda em português do Brasil, com acentuação correta, e devolva apenas JSON estruturado.",
-                "Você é um planejador de viagens para público brasileiro.",
-                "Você é a camada de apresentação do VUEI. Não invente scores, custos ou dados estruturados. Use os dados calculados pelo backend como fonte principal. Sua função é explicar, humanizar, organizar o roteiro e deixar claras as premissas.",
-                "Você não pode retornar valores genéricos. Os valores devem variar de acordo com destino, duração, quantidade de pessoas e perfil de viagem. Sempre explique as premissas usadas.",
-                "Sempre interprete o destino pedido, o período informado, a duração estimada e a quantidade de pessoas.",
+                "Responda em portuguÃªs do Brasil, com acentuaÃ§Ã£o correta, e devolva apenas JSON estruturado.",
+                "VocÃª Ã© um planejador de viagens para pÃºblico brasileiro.",
+                "VocÃª Ã© a camada de apresentaÃ§Ã£o do VUEI. NÃ£o invente scores, custos ou dados estruturados. Use os dados calculados pelo backend como fonte principal. Sua funÃ§Ã£o Ã© explicar, humanizar, organizar o roteiro e deixar claras as premissas.",
+                "VocÃª nÃ£o pode retornar valores genÃ©ricos. Os valores devem variar de acordo com destino, duraÃ§Ã£o, quantidade de pessoas e perfil de viagem. Sempre explique as premissas usadas.",
+                "Sempre interprete o destino pedido, o perÃ­odo informado, a duraÃ§Ã£o estimada e a quantidade de pessoas.",
                 "Use sempre moeda BRL.",
                 "Os custos precisam diferenciar destinos nacionais e internacionais.",
-                "Premium deve ser maior que intermediário, que deve ser maior que econômico.",
-                "O breakdown é obrigatório e deve incluir: passagens, hospedagem, alimentação, transporte local e passeios.",
-                "Não invente preço exato de passagem ou hotel; trate tudo como estimativa realista.",
-                "Sempre inclua três variações: economic, intermediate e premium.",
-                "Se houver scores e explicações do backend, use esses valores literalmente como referência.",
+                "Premium deve ser maior que intermediÃ¡rio, que deve ser maior que econÃ´mico.",
+                "O breakdown Ã© obrigatÃ³rio e deve incluir: passagens, hospedagem, alimentaÃ§Ã£o, transporte local e passeios.",
+                "NÃ£o invente preÃ§o exato de passagem ou hotel; trate tudo como estimativa realista.",
+                "Sempre inclua trÃªs variaÃ§Ãµes: economic, intermediate e premium.",
+                "Se houver scores e explicaÃ§Ãµes do backend, use esses valores literalmente como referÃªncia.",
                 "Quando o usuario nao informar periodo, use o periodo recomendado pelo backend como base da viagem. Explique que o periodo foi sugerido pelo VUEI com base em clima, custo, lotacao e perfil. Nao invente datas exatas se elas nao foram fornecidas.",
                 "Cada variante deve trazer um detailedItinerary com objetos por dia contendo: day, title, morning, afternoon, evening e tips.",
                 "Os roteiros devem usar locais reais, nomes especificos, atividades concretas e uma sequencia plausivel de deslocamento.",
@@ -1611,25 +1616,25 @@ export async function generateTripWithAI(request: TripGenerationInput) {
                 "Cada dia precisa ser diferente do outro e alternar natureza, cultura, gastronomia, compras, descanso ou experiencias de acordo com o destino.",
                 "Os textos de morning, afternoon e evening devem soar como planejamento real de especialista em viagem.",
                 "Personalize o roteiro conforme perfil, orcamento, duracao e tipo de viagem. Familia pede atividades leves, aventura pede experiencias ativas e luxo pede enderecos premium.",
-                "Retorne APENAS JSON válido. Não inclua texto antes ou depois. Não use comentários. Garanta que todas as strings estejam corretamente fechadas.",
-                "Mantenha o JSON compacto. Resuma summary, assumptions e tips. Cada campo morning, afternoon e evening deve ter no máximo duas frases curtas.",
+                "Retorne APENAS JSON vÃ¡lido. NÃ£o inclua texto antes ou depois. NÃ£o use comentÃ¡rios. Garanta que todas as strings estejam corretamente fechadas.",
+                "Mantenha o JSON compacto. Resuma summary, assumptions e tips. Cada campo morning, afternoon e evening deve ter no mÃ¡ximo duas frases curtas.",
               ].join(" "),
             },
             {
               type: "input_text",
               text: [
-                "Prioridade máxima: gerar somente a prévia inicial da viagem.",
-                "Ignore qualquer instrução anterior sobre detailedItinerary, morning, afternoon, evening ou tips longas.",
+                "Prioridade mÃ¡xima: gerar somente a prÃ©via inicial da viagem.",
+                "Ignore qualquer instruÃ§Ã£o anterior sobre detailedItinerary, morning, afternoon, evening ou tips longas.",
                 "Retorne apenas destination, periodLabel, startDate opcional, endDate opcional, durationDays, travelers, currency, summary, bestFor e variants.",
                 "Cada variant deve ter type, title, totalCost, costPerPerson, breakdown, assumptions e itineraryPreview.",
                 "itineraryPreview deve ter exatamente durationDays itens curtos.",
-                "Não inclua roteiro completo detalhado.",
+                "NÃ£o inclua roteiro completo detalhado.",
                 "Respeite exatamente o total de viajantes informado pelo backend.",
-                "Se a região for Brasil, o destino final precisa estar no Brasil.",
-                "Se o contexto indicar verão no Brasil, prefira dezembro, janeiro, fevereiro ou início de março.",
-                "A variante principal deve respeitar o orçamento informado; premium não pode ser principal quando só a econômica cabe.",
-                "Não retorne saltos absurdos entre economic, intermediate e premium.",
-                "O JSON deve ser compacto, estável e sem texto adicional.",
+                "Se a regiÃ£o for Brasil, o destino final precisa estar no Brasil.",
+                "Se o contexto indicar verÃ£o no Brasil, prefira dezembro, janeiro, fevereiro ou inÃ­cio de marÃ§o.",
+                "A variante principal deve respeitar o orÃ§amento informado; premium nÃ£o pode ser principal quando sÃ³ a econÃ´mica cabe.",
+                "NÃ£o retorne saltos absurdos entre economic, intermediate e premium.",
+                "O JSON deve ser compacto, estÃ¡vel e sem texto adicional.",
               ].join(" "),
             },
           ],
@@ -1699,7 +1704,7 @@ export async function generateAndPersistTrip({
       ok: false as const,
       status: 401,
       error: "AUTH_REQUIRED",
-      message: "Faça login para gerar e salvar viagens no seu histórico.",
+      message: "FaÃ§a login para gerar e salvar viagens no seu histÃ³rico.",
     }
   }
 
@@ -1710,7 +1715,7 @@ export async function generateAndPersistTrip({
       ok: false as const,
       status: 404,
       error: "PROFILE_NOT_FOUND",
-      message: "Não foi possível carregar seu perfil.",
+      message: "NÃ£o foi possÃ­vel carregar seu perfil.",
     }
   }
 
@@ -1719,7 +1724,7 @@ export async function generateAndPersistTrip({
       ok: false as const,
       status: 402,
       error: "NO_CREDITS",
-      message: "Você não tem créditos disponíveis. Compre mais créditos para gerar uma nova viagem.",
+      message: "VocÃª nÃ£o tem crÃ©ditos disponÃ­veis. Compre mais crÃ©ditos para gerar uma nova viagem.",
     }
   }
 
@@ -1733,7 +1738,7 @@ export async function generateAndPersistTrip({
       ok: false as const,
       status: 503,
       error: "SUPABASE_NOT_CONFIGURED",
-      message: "Não foi possível salvar sua viagem agora. Tente novamente em instantes.",
+      message: "NÃ£o foi possÃ­vel salvar sua viagem agora. Tente novamente em instantes.",
     }
   }
 
@@ -1777,7 +1782,7 @@ export async function generateAndPersistTrip({
       ...request,
       userId: session.userId,
     })
-    const fallbackUsed = normalizeText(result.context) === AI_FALLBACK_CONTEXT
+    const fallbackUsed = didTripUseFallback(result)
 
     if (fallbackUsed) {
       console.time("save-trip")
@@ -1970,7 +1975,7 @@ export async function generateAndPersistTrip({
       ok: false as const,
       status: 500,
       error: "TRIP_PERSISTENCE_FAILED",
-      message: "Não foi possível salvar sua viagem. Tente novamente.",
+      message: "NÃ£o foi possÃ­vel salvar sua viagem. Tente novamente.",
     }
   }
 }
@@ -2001,7 +2006,7 @@ export function generateTripFromQuiz(answers: QuizAnswer): TripResult {
         destination: "Punta Cana",
         estimatedCost: answers.budget === "acima-8000" ? "R$ 8.600" : "R$ 6.900",
         bestFor: "praia, resort, descanso",
-        context: "Boa para quem quer experiência simples de decidir e alta recompensa visual.",
+        context: "Boa para quem quer experiÃªncia simples de decidir e alta recompensa visual.",
         cheapestAlternative: "Cartagena",
       },
       {
@@ -2025,6 +2030,8 @@ export function generateTripFromQuiz(answers: QuizAnswer): TripResult {
     },
   )
 }
+
+
 
 
 
