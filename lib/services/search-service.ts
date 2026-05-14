@@ -1,7 +1,7 @@
 import type { Search } from "@/types/search"
-import type { TripItineraryDay, TripResult } from "@/types/trip"
 import type { SearchRow } from "@/types/database"
-import { createSupabaseAdminClient, createSupabaseServerClient } from "@/lib/supabase/server"
+import type { TripItineraryDay, TripResult } from "@/types/trip"
+import { createSupabaseServerClient } from "@/lib/supabase/server"
 
 function asVariants(value: unknown): TripResult["variants"] {
   return Array.isArray(value) ? (value as TripResult["variants"]) : undefined
@@ -33,7 +33,7 @@ function mapSearchRowToSearch(row: SearchRow): Search {
   const fullItinerary = asStringArray(rawResult.fullItinerary)
   const detailedItinerary = asDetailedItinerary(rawResult.detailedItinerary)
   const tips = asStringArray(rawResult.tips)
-  const destination = typeof rawResult.destination === "string" ? rawResult.destination : "Destino indisponível"
+  const destination = typeof rawResult.destination === "string" ? rawResult.destination : "Destino indisponivel"
   const estimatedCost = typeof rawResult.estimatedCost === "string" ? rawResult.estimatedCost : "R$ 0"
   const summary = typeof rawResult.summary === "string" ? rawResult.summary : row.prompt
   const bestFor = typeof rawResult.bestFor === "string" ? rawResult.bestFor : "indefinido"
@@ -115,21 +115,6 @@ function mapSearchRowToSearch(row: SearchRow): Search {
     createdAt: row.created_at,
     result,
   }
-}
-
-export async function listSearches() {
-  const supabase = createSupabaseAdminClient()
-  const { data, error } = await supabase.from("searches").select("*").order("created_at", { ascending: false })
-
-  if (error || !data) {
-    return []
-  }
-
-  return (data as SearchRow[]).map(mapSearchRowToSearch)
-}
-
-export async function listTravelHistory() {
-  return listSearches()
 }
 
 export async function listUserTravelHistory(userId: string | null | undefined) {

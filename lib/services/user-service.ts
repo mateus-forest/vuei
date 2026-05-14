@@ -1,7 +1,6 @@
 import type { ProfileRow } from "@/types/database"
 import type { AppSession } from "@/types/session"
 import type { User } from "@/types/user"
-import { mockUsers } from "@/lib/mocks/users"
 import { INITIAL_BONUS_CREDITS } from "@/lib/services/credit-service"
 import { ensureSignupBonusTransaction } from "@/lib/services/credit-transaction-service"
 import { createSupabaseAdminClient } from "@/lib/supabase/server"
@@ -9,7 +8,7 @@ import { createSupabaseAdminClient } from "@/lib/supabase/server"
 function mapProfileToUser(profile: Partial<ProfileRow> & Pick<ProfileRow, "id" | "email">): User {
   return {
     id: profile.id,
-    name: profile.full_name ?? profile.name ?? profile.email.split("@")[0] ?? "Usuário VUEI",
+    name: profile.full_name ?? profile.name ?? profile.email.split("@")[0] ?? "Usuario VUEI",
     email: profile.email,
     phone: profile.phone ?? "",
     credits: typeof profile.credits === "number" ? profile.credits : INITIAL_BONUS_CREDITS,
@@ -25,7 +24,7 @@ function buildFallbackProfile(session: AppSession): ProfileRow | null {
     return null
   }
 
-  const baseName = session.email.split("@")[0] || "Usuário VUEI"
+  const baseName = session.email.split("@")[0] || "Usuario VUEI"
 
   return {
     id: session.userId,
@@ -133,9 +132,3 @@ export async function getCurrentUser(session?: AppSession | null, options?: { al
 
   return mapProfileToUser(profile)
 }
-
-export function listUsers() {
-  return mockUsers
-}
-
-// TODO: trocar fallback mock por queries reais no admin quando a etapa de banco estiver concluída.
